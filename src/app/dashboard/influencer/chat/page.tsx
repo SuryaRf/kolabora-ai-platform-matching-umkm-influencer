@@ -26,8 +26,8 @@ export default function Chat() {
 
   return (
     <FeaturePage
-      title="Chat & Messaging"
-      description="Berdiskusi langsung dengan UMKM mengenai detail kerja sama, negosiasi, dan koordinasi kampanye."
+      title="Chat & Collaboration"
+      description="Ruang komunikasi langsung dengan fitur one-click template brief di dalam obrolan."
       icon={MessageSquare}
       gradient="bg-kolabora"
     >

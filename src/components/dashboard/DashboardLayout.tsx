@@ -4,32 +4,24 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Sparkles,
   Bell,
   Search,
   LayoutDashboard,
-  Users,
   MessageSquare,
   BarChart3,
-  Settings,
   LogOut,
   Store,
   Camera,
   Zap,
   Bot,
-  ShieldCheck,
-  Calendar,
-  Star,
-  Wand2,
-  DollarSign,
   PieChart,
-  Medal,
-  FileText,
   ChevronLeft,
   ChevronRight,
   X,
   Menu,
+  Eye,
 } from "lucide-react";
+import Image from "next/image";
 
 interface NavItem {
   icon: typeof LayoutDashboard;
@@ -41,12 +33,9 @@ const umkmNav: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Zap, label: "AI Smart Matching", href: "/dashboard/umkm/smart-matching" },
   { icon: Bot, label: "AI Skill Assistant", href: "/dashboard/umkm/skill-assistant" },
-  { icon: ShieldCheck, label: "Brief Compliance", href: "/dashboard/umkm/compliance-checker" },
-  { icon: Calendar, label: "Smart Calendar", href: "/dashboard/umkm/smart-calendar" },
-  { icon: Star, label: "Influencer Highlights", href: "/dashboard/umkm/highlights" },
-  { icon: Users, label: "Influencer Directory", href: "/dashboard/umkm/directory" },
   { icon: LayoutDashboard, label: "Campaign Dashboard", href: "/dashboard/umkm/campaigns" },
-  { icon: MessageSquare, label: "Chat & Messaging", href: "/dashboard/umkm/chat" },
+  { icon: MessageSquare, label: "Chat & Collaboration", href: "/dashboard/umkm/chat" },
+  { icon: Eye, label: "Review Campaign", href: "/dashboard/umkm/review-campaign" },
   { icon: BarChart3, label: "Campaign Analytics", href: "/dashboard/umkm/analytics" },
 ];
 
@@ -54,12 +43,9 @@ const influencerNav: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Zap, label: "AI Smart Matching", href: "/dashboard/influencer/smart-matching" },
   { icon: PieChart, label: "Portfolio & Performance", href: "/dashboard/influencer/portfolio" },
-  { icon: Wand2, label: "AI Profile Optimizer", href: "/dashboard/influencer/profile-optimizer" },
-  { icon: DollarSign, label: "AI Rate Recommendation", href: "/dashboard/influencer/rate-recommendation" },
-  { icon: FileText, label: "Auto-Script Generator", href: "/dashboard/influencer/auto-script" },
-  { icon: Users, label: "Influencer Directory", href: "/dashboard/influencer/directory" },
+  { icon: Bot, label: "AI Content Assistant", href: "/dashboard/influencer/ai-content-assistant" },
   { icon: LayoutDashboard, label: "Campaign Dashboard", href: "/dashboard/influencer/campaigns" },
-  { icon: MessageSquare, label: "Chat & Messaging", href: "/dashboard/influencer/chat" },
+  { icon: MessageSquare, label: "Chat & Collaboration", href: "/dashboard/influencer/chat" },
   { icon: BarChart3, label: "Campaign Analytics", href: "/dashboard/influencer/analytics" },
 ];
 
@@ -89,7 +75,7 @@ export default function DashboardLayout({
       >
         <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
           <Link href="/" className={`flex items-center gap-2 ${collapsed ? "justify-center w-full" : ""}`}>
-            <Sparkles className="w-5 h-5 text-kolabora flex-shrink-0" />
+            <Image src="/logo.png" alt="Kolabora" width={28} height={28} className="w-7 h-7 flex-shrink-0" />
             {!collapsed && <span className="text-lg font-bold text-gradient">Kolabora</span>}
           </Link>
           <button

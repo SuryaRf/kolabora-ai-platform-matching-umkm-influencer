@@ -23,7 +23,7 @@ export default function RateRecommendation() {
   return (
     <FeaturePage
       title="AI Rate Recommendation"
-      description="Dapatkan estimasi tarif kerja sama yang kompetitif berdasarkan analisis data dan tren pasar."
+      description="Kalkulator tarif otomatis (rate card) berbasis data engagement riil dan tren pasar untuk negosiasi yang kompetitif."
       icon={DollarSign}
       gradient="bg-kolabora"
     >

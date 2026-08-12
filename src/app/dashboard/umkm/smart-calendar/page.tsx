@@ -35,7 +35,7 @@ export default function SmartCalendar() {
   return (
     <FeaturePage
       title="Smart Calendar"
-      description="Atur jadwal kampanye dengan rekomendasi AI untuk waktu terbaik publikasi konten."
+      description="Kalender cerdas untuk rekomendasi tenggat proyek dan jadwal penayangan iklan terbaik."
       icon={Calendar}
       gradient="bg-kolabora"
     >

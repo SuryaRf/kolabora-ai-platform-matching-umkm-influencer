@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Navbar() {
@@ -12,7 +13,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-kolabora" />
+            <Image src="/logo.png" alt="Kolabora" width={40} height={40} className="w-10 h-10" />
             <span className="text-xl font-bold text-gradient">Kolabora</span>
           </Link>
 

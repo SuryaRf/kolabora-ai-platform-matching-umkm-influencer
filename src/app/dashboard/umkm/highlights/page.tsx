@@ -17,8 +17,8 @@ const highlights = [
 export default function Highlights() {
   return (
     <FeaturePage
-      title="Influencer Highlights"
-      description="Daftar influencer dengan performa terbaik berdasarkan kategori dan engagement rate bulan ini."
+      title="Influencer Insights / Recommendation"
+      description="Menyajikan insight performa influencer, engagement rate, demografi audiens, niche konten."
       icon={Star}
       gradient="bg-kolabora"
     >

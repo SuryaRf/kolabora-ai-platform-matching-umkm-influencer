@@ -1,6 +1,7 @@
 "use client";
 
-import { Sparkles, Store, Camera, ArrowRight, Zap, TrendingUp, Users, Star } from "lucide-react";
+import { Store, Camera, ArrowRight, Zap, TrendingUp, Users, Star } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function DashboardLanding() {
@@ -9,7 +10,7 @@ export default function DashboardLanding() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <div className="text-center mb-12">
           <Link href="/" className="inline-flex items-center gap-2 mb-8">
-            <Sparkles className="w-6 h-6 text-kolabora" />
+            <Image src="/logo.png" alt="Kolabora" width={40} height={40} className="w-10 h-10" />
             <span className="text-xl font-bold text-gradient">Kolabora</span>
           </Link>
           <h1 className="text-3xl sm:text-4xl font-bold mb-3">Dashboard Kolabora</h1>
@@ -30,7 +31,7 @@ export default function DashboardLanding() {
               Masuk ke Dashboard UMKM <ArrowRight className="w-4 h-4" />
             </div>
             <div className="mt-6 flex items-center gap-4 text-xs text-zinc-400">
-              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5" /> 9 Fitur AI</span>
+              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5" /> 6 Fitur MVP</span>
               <span className="flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" /> Smart Matching</span>
             </div>
           </Link>
@@ -48,8 +49,8 @@ export default function DashboardLanding() {
               Masuk ke Dashboard Influencer <ArrowRight className="w-4 h-4" />
             </div>
             <div className="mt-6 flex items-center gap-4 text-xs text-zinc-400">
-              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5" /> 9 Fitur AI</span>
-              <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5" /> Auto-Script</span>
+              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5" /> 6 Fitur MVP</span>
+              <span className="flex items-center gap-1"><Star className="w-3.5 h-3.5" /> Portfolio &amp; Performance</span>
             </div>
           </Link>
         </div>

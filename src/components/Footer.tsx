@@ -1,4 +1,5 @@
-import { Sparkles, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function Footer() {
@@ -8,7 +9,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-6 h-6 text-kolabora-light" />
+              <Image src="/logo.png" alt="Kolabora" width={40} height={40} className="w-10 h-10 brightness-200" />
               <span className="text-xl font-bold text-white">Kolabora</span>
             </Link>
             <p className="text-sm leading-relaxed max-w-md">
@@ -83,10 +84,7 @@ export default function Footer() {
           <p className="text-xs">
             &copy; {new Date().getFullYear()} Kolabora. All rights reserved.
           </p>
-          <p className="text-xs flex items-center gap-1">
-            Dibuat dengan <Heart className="w-3 h-3 text-influencer" /> untuk
-            ekonomi kreatif Indonesia
-          </p>
+          
         </div>
       </div>
     </footer>

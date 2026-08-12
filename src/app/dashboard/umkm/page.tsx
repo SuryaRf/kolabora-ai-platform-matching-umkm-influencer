@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, Target, Users, Clock, Zap, Bot, ShieldCheck, Calendar, Star, ArrowRight } from "lucide-react";
+import { TrendingUp, Target, Users, Clock, Zap, Bot, Eye, ArrowRight, LayoutDashboard, MessageSquare, BarChart3 } from "lucide-react";
 import Link from "next/link";
 
 const stats = [
@@ -13,10 +13,10 @@ const stats = [
 const quickActions = [
   { icon: Zap, label: "Smart Matching", href: "/dashboard/umkm/smart-matching", color: "bg-kolabora" },
   { icon: Bot, label: "AI Assistant", href: "/dashboard/umkm/skill-assistant", color: "bg-umkm" },
-  { icon: ShieldCheck, label: "Compliance", href: "/dashboard/umkm/compliance-checker", color: "bg-emerald-500" },
-  { icon: Calendar, label: "Smart Calendar", href: "/dashboard/umkm/smart-calendar", color: "bg-sky-500" },
-  { icon: Star, label: "Highlights", href: "/dashboard/umkm/highlights", color: "bg-amber-500" },
-  { icon: Users, label: "Directory", href: "/dashboard/umkm/directory", color: "bg-kolabora-dark" },
+  { icon: LayoutDashboard, label: "Campaign", href: "/dashboard/umkm/campaigns", color: "bg-sky-500" },
+  { icon: MessageSquare, label: "Chat", href: "/dashboard/umkm/chat", color: "bg-emerald-500" },
+  { icon: Eye, label: "Review Campaign", href: "/dashboard/umkm/review-campaign", color: "bg-purple-500" },
+  { icon: BarChart3, label: "Analytics", href: "/dashboard/umkm/analytics", color: "bg-rose-500" },
 ];
 
 const recentMatches = [

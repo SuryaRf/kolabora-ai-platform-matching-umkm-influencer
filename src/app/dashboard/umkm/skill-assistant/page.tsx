@@ -42,7 +42,7 @@ export default function SkillAssistant() {
   return (
     <FeaturePage
       title="AI Skill Assistant"
-      description="Asisten AI yang membantu menyusun brief, caption, ide konten, dan strategi pemasaran digital."
+      description="Asisten AI untuk membantu UMKM menyusun brief kampanye, menghasilkan ide konten, membuat caption promosi, serta memberikan rekomendasi strategi pemasaran."
       icon={Bot}
       gradient="bg-kolabora"
     >

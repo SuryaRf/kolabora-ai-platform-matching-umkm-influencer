@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, Target, Users, Clock, Zap, PieChart, Wand2, DollarSign, FileText, ArrowRight } from "lucide-react";
+import { TrendingUp, Target, Users, Clock, Zap, PieChart, Bot, LayoutDashboard, MessageSquare, BarChart3, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 const stats = [
@@ -13,10 +13,10 @@ const stats = [
 const quickActions = [
   { icon: Zap, label: "Smart Matching", href: "/dashboard/influencer/smart-matching", color: "bg-kolabora" },
   { icon: PieChart, label: "Portfolio", href: "/dashboard/influencer/portfolio", color: "bg-purple-500" },
-  { icon: Wand2, label: "Optimizer", href: "/dashboard/influencer/profile-optimizer", color: "bg-influencer" },
-  { icon: DollarSign, label: "Rate", href: "/dashboard/influencer/rate-recommendation", color: "bg-emerald-500" },
-  { icon: FileText, label: "Auto-Script", href: "/dashboard/influencer/auto-script", color: "bg-sky-500" },
-  { icon: Users, label: "Directory", href: "/dashboard/influencer/directory", color: "bg-kolabora-dark" },
+  { icon: Bot, label: "Content Assistant", href: "/dashboard/influencer/ai-content-assistant", color: "bg-violet-500" },
+  { icon: LayoutDashboard, label: "Campaign", href: "/dashboard/influencer/campaigns", color: "bg-sky-500" },
+  { icon: MessageSquare, label: "Chat", href: "/dashboard/influencer/chat", color: "bg-emerald-500" },
+  { icon: BarChart3, label: "Analytics", href: "/dashboard/influencer/analytics", color: "bg-rose-500" },
 ];
 
 const campaignUpdates = [

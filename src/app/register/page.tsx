@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Mail, Lock, Store, Camera, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Store, Camera, Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function RegisterPage() {
@@ -12,7 +13,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-zinc-50 to-white dark:from-zinc-950 dark:to-black">
       <nav className="p-4">
         <Link href="/" className="inline-flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-kolabora" />
+          <Image src="/logo.png" alt="Kolabora" width={32} height={32} className="w-8 h-8" />
           <span className="text-lg font-bold text-gradient">Kolabora</span>
         </Link>
       </nav>

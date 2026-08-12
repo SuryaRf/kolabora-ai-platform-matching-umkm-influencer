@@ -22,7 +22,7 @@ export default function ProfileOptimizer() {
   return (
     <FeaturePage
       title="AI Profile Optimizer"
-      description="Analisis profil media sosial dan dapatkan rekomendasi optimasi personal branding berbasis AI."
+      description="Analisis AI untuk optimalisasi teks bio promosi dan portofolio digital secara memikat."
       icon={Wand2}
       gradient="bg-kolabora"
     >

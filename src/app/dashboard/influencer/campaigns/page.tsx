@@ -30,7 +30,7 @@ export default function Campaigns() {
   return (
     <FeaturePage
       title="Campaign Dashboard"
-      description="Kelola seluruh aktivitas kolaborasi, dari menerima penawaran hingga menyelesaikan kampanye."
+      description="Dasbor bersama untuk memantau status proyek, linimasa, dan draf konten secara kolaboratif."
       icon={LayoutDashboard}
       gradient="bg-kolabora"
     >

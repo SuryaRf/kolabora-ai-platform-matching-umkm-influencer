@@ -29,7 +29,7 @@ export default function Analytics() {
   return (
     <FeaturePage
       title="Campaign Analytics"
-      description="Analisis performa kampanye dengan metrik lengkap dan rekomendasi berbasis AI untuk optimasi."
+      description="Laporan performa pasca-kampanye via API yang dilengkapi sistem pembayaran aman (escrow)."
       icon={BarChart3}
       gradient="bg-kolabora"
     >

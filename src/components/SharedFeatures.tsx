@@ -11,36 +11,29 @@ const features = [
     icon: Zap,
     title: "AI Smart Matching",
     description:
-      "Sistem AI merekomendasikan partner berdasarkan kecocokan profil, niche, audiens, lokasi, dan performa akun untuk hasil kolaborasi yang optimal.",
+      "Algoritma cerdas yang otomatis merekomendasikan UMKM dengan kreator yang paling relevan berdasarkan niche dan target pasar.",
     gradient: "bg-kolabora",
-  },
-  {
-    icon: Users,
-    title: "Influencer Directory",
-    description:
-      "Direktori influencer dengan filter kategori konten, jumlah pengikut, lokasi, dan tarif untuk menemukan kreator yang sesuai dengan kebutuhan kampanye.",
-    gradient: "bg-kolabora-dark",
   },
   {
     icon: MessageSquare,
-    title: "Chat & Messaging",
+    title: "Chat & Collaboration",
     description:
-      "Komunikasi langsung antara UMKM dan influencer untuk diskusi, negosiasi, dan penyepakatan kerja sama tanpa berpindah platform.",
-    gradient: "bg-kolabora",
+      "Ruang komunikasi langsung dengan fitur one-click template brief di dalam obrolan.",
+    gradient: "bg-kolabora-dark",
   },
   {
     icon: LayoutDashboard,
     title: "Campaign Dashboard",
     description:
-      "Kelola seluruh kampanye mulai dari penerimaan proyek, pemantauan progres, status campaign, hingga pengingat deadline.",
-    gradient: "bg-kolabora-dark",
+      "Dasbor bersama untuk memantau status proyek, linimasa, dan draf konten secara kolaboratif.",
+    gradient: "bg-kolabora",
   },
   {
     icon: BarChart3,
     title: "Campaign Analytics",
     description:
-      "Laporan performa kampanye dengan metrik reach, impresi, engagement, dan efektivitas untuk evaluasi hasil promosi.",
-    gradient: "bg-kolabora",
+      "Laporan performa pasca-kampanye via API yang dilengkapi sistem pembayaran aman (escrow).",
+    gradient: "bg-kolabora-dark",
   },
 ];
 

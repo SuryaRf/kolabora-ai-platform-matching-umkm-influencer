@@ -20,7 +20,7 @@ export default function Portfolio() {
   return (
     <FeaturePage
       title="Portfolio & Performance Dashboard"
-      description="Tampilkan portofolio digital dan performa akun media sosial secara terintegrasi untuk meningkatkan kredibilitas."
+      description="Dasbor yang menampilkan portofolio digital, statistik performa media sosial, dan histori campaign."
       icon={PieChart}
       gradient="bg-kolabora"
     >

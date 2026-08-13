@@ -20,6 +20,7 @@ import {
   X,
   Menu,
   Eye,
+  History,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -32,21 +33,22 @@ interface NavItem {
 const umkmNav: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Zap, label: "AI Smart Matching", href: "/dashboard/umkm/smart-matching" },
-  { icon: Bot, label: "AI Skill Assistant", href: "/dashboard/umkm/skill-assistant" },
-  { icon: LayoutDashboard, label: "Campaign Dashboard", href: "/dashboard/umkm/campaigns" },
+  { icon: History, label: "Riwayat Kolaborasi", href: "/dashboard/umkm/history" },
   { icon: MessageSquare, label: "Chat & Collaboration", href: "/dashboard/umkm/chat" },
   { icon: Eye, label: "Review Campaign", href: "/dashboard/umkm/review-campaign" },
   { icon: BarChart3, label: "Campaign Analytics", href: "/dashboard/umkm/analytics" },
+  { icon: Bot, label: "AI Skill Assistant", href: "/dashboard/umkm/skill-assistant" },
 ];
 
 const influencerNav: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Zap, label: "AI Smart Matching", href: "/dashboard/influencer/smart-matching" },
+  { icon: History, label: "Riwayat Kolaborasi", href: "/dashboard/influencer/history" },
+  { icon: MessageSquare, label: "Chat & Collaboration", href: "/dashboard/influencer/chat" },
+  { icon: LayoutDashboard, label: "Campaign Dashboard", href: "/dashboard/influencer/campaigns" },
+  { icon: BarChart3, label: "Campaign Analytics", href: "/dashboard/influencer/analytics" },
   { icon: PieChart, label: "Portfolio & Performance", href: "/dashboard/influencer/portfolio" },
   { icon: Bot, label: "AI Content Assistant", href: "/dashboard/influencer/ai-content-assistant" },
-  { icon: LayoutDashboard, label: "Campaign Dashboard", href: "/dashboard/influencer/campaigns" },
-  { icon: MessageSquare, label: "Chat & Collaboration", href: "/dashboard/influencer/chat" },
-  { icon: BarChart3, label: "Campaign Analytics", href: "/dashboard/influencer/analytics" },
 ];
 
 const roleConfig = {

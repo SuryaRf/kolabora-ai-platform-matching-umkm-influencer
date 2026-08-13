@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Check,
   X,
@@ -9,6 +10,7 @@ import {
   Send,
   CheckCircle2,
   ChevronLeft,
+  History,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -29,6 +31,7 @@ export interface MatchItem {
   avatar: string;
   color: string;
   score: number;
+  budget?: string;
   reasons: MatchReason[];
   stats: MatchStat[];
 }
@@ -38,6 +41,8 @@ interface OneByOneMatchProps {
   noun: string;
   ctaLabel: string;
   ctaSuccess: string;
+  historyHref?: string;
+  onMatch?: (item: MatchItem) => void;
 }
 
 export default function OneByOneMatch({
@@ -45,6 +50,8 @@ export default function OneByOneMatch({
   noun,
   ctaLabel,
   ctaSuccess,
+  historyHref,
+  onMatch,
 }: OneByOneMatchProps) {
   const [index, setIndex] = useState(0);
   const [matched, setMatched] = useState<number[]>([]);
@@ -71,6 +78,7 @@ export default function OneByOneMatch({
     setMatched((m) => [...m, index]);
     setJustMatched(current.name);
     setIndex((i) => i + 1);
+    onMatch?.(current);
   };
 
   const reset = () => {
@@ -166,12 +174,22 @@ export default function OneByOneMatch({
               ))}
             </div>
           )}
-          <button
-            onClick={reset}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-kolabora hover:bg-kolabora-dark transition-all"
-          >
-            <RotateCcw className="w-4 h-4" /> Mulai Ulang Matching
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={reset}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-kolabora hover:bg-kolabora-dark transition-all"
+            >
+              <RotateCcw className="w-4 h-4" /> Mulai Ulang Matching
+            </button>
+            {historyHref && (
+              <Link
+                href={historyHref}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-kolabora bg-kolabora/10 hover:bg-kolabora/20 transition-all"
+              >
+                <History className="w-4 h-4" /> Lihat Riwayat Kolaborasi
+              </Link>
+            )}
+          </div>
         </div>
       ) : (
         current && (

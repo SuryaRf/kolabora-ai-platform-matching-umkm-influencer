@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, Target, Users, Clock, Zap, PieChart, Bot, LayoutDashboard, MessageSquare, BarChart3, ArrowRight } from "lucide-react";
+import { TrendingUp, Target, Users, Clock, Zap, PieChart, Bot, LayoutDashboard, MessageSquare, BarChart3, ArrowRight, History } from "lucide-react";
 import Link from "next/link";
 
 const stats = [
@@ -12,6 +12,7 @@ const stats = [
 
 const quickActions = [
   { icon: Zap, label: "Smart Matching", href: "/dashboard/influencer/smart-matching", color: "bg-kolabora" },
+  { icon: History, label: "Riwayat", href: "/dashboard/influencer/history", color: "bg-cyan-500" },
   { icon: PieChart, label: "Portfolio", href: "/dashboard/influencer/portfolio", color: "bg-purple-500" },
   { icon: Bot, label: "Content Assistant", href: "/dashboard/influencer/ai-content-assistant", color: "bg-violet-500" },
   { icon: LayoutDashboard, label: "Campaign", href: "/dashboard/influencer/campaigns", color: "bg-sky-500" },
@@ -21,8 +22,8 @@ const quickActions = [
 
 const campaignUpdates = [
   { brand: "Kopi Nusantara", status: "Review", statusColor: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" },
-  { brand: "Skincare Glowing", status: "Produksi", statusColor: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" },
-  { brand: "TechGadget ID", status: "Diterima", statusColor: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  { brand: "Skincare Glowing", status: "Produksi", statusColor: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" },
+  { brand: "TechGadget ID", status: "Dikonfirmasi", statusColor: "bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400" },
 ];
 
 export default function InfluencerOverview() {

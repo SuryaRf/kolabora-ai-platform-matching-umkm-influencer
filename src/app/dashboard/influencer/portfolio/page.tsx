@@ -1,6 +1,7 @@
 "use client";
 
-import { PieChart, Users, Heart, Eye, TrendingUp, Camera, Video, Music2, Globe, ExternalLink, Star } from "lucide-react";
+import Link from "next/link";
+import { PieChart, Users, Heart, Eye, TrendingUp, Camera, Video, Music2, Globe, ExternalLink, Star, ArrowRight } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
 
 const platformStats = [
@@ -69,7 +70,12 @@ export default function Portfolio() {
       </div>
 
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
-        <h3 className="font-semibold text-sm mb-4">Riwayat Kolaborasi</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-sm">Riwayat Kolaborasi</h3>
+          <Link href="/dashboard/influencer/history" className="text-xs text-kolabora hover:underline flex items-center gap-1">
+            Lihat Alur Kolaborasi <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
         <div className="space-y-3">
           {pastCampaigns.map((pc, i) => (
             <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">

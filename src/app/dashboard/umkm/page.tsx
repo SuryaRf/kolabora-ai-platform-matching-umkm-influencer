@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, Target, Users, Clock, Zap, Bot, Eye, ArrowRight, LayoutDashboard, MessageSquare, BarChart3 } from "lucide-react";
+import { TrendingUp, Target, Users, Clock, Zap, Bot, Eye, ArrowRight, MessageSquare, BarChart3, History } from "lucide-react";
 import Link from "next/link";
 
 const stats = [
@@ -12,8 +12,8 @@ const stats = [
 
 const quickActions = [
   { icon: Zap, label: "Smart Matching", href: "/dashboard/umkm/smart-matching", color: "bg-kolabora" },
+  { icon: History, label: "Riwayat", href: "/dashboard/umkm/history", color: "bg-cyan-500" },
   { icon: Bot, label: "AI Assistant", href: "/dashboard/umkm/skill-assistant", color: "bg-umkm" },
-  { icon: LayoutDashboard, label: "Campaign", href: "/dashboard/umkm/campaigns", color: "bg-sky-500" },
   { icon: MessageSquare, label: "Chat", href: "/dashboard/umkm/chat", color: "bg-emerald-500" },
   { icon: Eye, label: "Review Campaign", href: "/dashboard/umkm/review-campaign", color: "bg-purple-500" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/umkm/analytics", color: "bg-rose-500" },

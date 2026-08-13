@@ -3,6 +3,7 @@
 import { Zap, Store, Users, MapPin, Clock } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
 import OneByOneMatch, { type MatchItem } from "@/components/dashboard/OneByOneMatch";
+import { useCollaborations } from "@/lib/collaborations";
 
 const campaigns: MatchItem[] = [
   {
@@ -10,6 +11,7 @@ const campaigns: MatchItem[] = [
     subtitle: "Kuliner & Minuman • Yogyakarta",
     avatar: "KN",
     color: "bg-orange-500",
+    budget: "Rp 3-5 Jt",
     score: 96,
     reasons: [
       { label: "Kategori sesuai niche Anda", pct: 100 },
@@ -29,6 +31,7 @@ const campaigns: MatchItem[] = [
     subtitle: "Kecantikan • Jakarta",
     avatar: "SG",
     color: "bg-pink-500",
+    budget: "Rp 5-8 Jt",
     score: 94,
     reasons: [
       { label: "Kategori sesuai niche Anda", pct: 98 },
@@ -48,6 +51,7 @@ const campaigns: MatchItem[] = [
     subtitle: "Teknologi • Bandung",
     avatar: "TG",
     color: "bg-blue-500",
+    budget: "Rp 7-12 Jt",
     score: 91,
     reasons: [
       { label: "Kategori sesuai niche Anda", pct: 100 },
@@ -67,6 +71,7 @@ const campaigns: MatchItem[] = [
     subtitle: "Olahraga • Surabaya",
     avatar: "SA",
     color: "bg-green-500",
+    budget: "Rp 2-5 Jt",
     score: 87,
     reasons: [
       { label: "Kategori sesuai niche Anda", pct: 95 },
@@ -86,6 +91,7 @@ const campaigns: MatchItem[] = [
     subtitle: "Travel & Hospitality • Bali",
     avatar: "BR",
     color: "bg-sky-500",
+    budget: "Rp 4-8 Jt",
     score: 84,
     reasons: [
       { label: "Kategori sesuai niche Anda", pct: 90 },
@@ -105,6 +111,7 @@ const campaigns: MatchItem[] = [
     subtitle: "Parenting & Keluarga • Jakarta",
     avatar: "MC",
     color: "bg-purple-500",
+    budget: "Rp 1-3 Jt",
     score: 79,
     reasons: [
       { label: "Target audiens cocok", pct: 90 },
@@ -122,6 +129,8 @@ const campaigns: MatchItem[] = [
 ];
 
 export default function InfluencerSmartMatching() {
+  const { addCollaboration } = useCollaborations("influencer");
+
   return (
     <FeaturePage
       title="AI Smart Matching"
@@ -133,7 +142,18 @@ export default function InfluencerSmartMatching() {
         items={campaigns}
         noun="campaign"
         ctaLabel="Ajukan Diri"
-        ctaSuccess="Pengajuan berhasil dikirim ke brand. Pantau statusnya di menu Campaign."
+        ctaSuccess="Pengajuan berhasil dikirim ke brand. Pantau progresnya di menu Riwayat Kolaborasi."
+        historyHref="/dashboard/influencer/history"
+        onMatch={(item) =>
+          addCollaboration({
+            name: item.name,
+            subtitle: item.subtitle,
+            avatar: item.avatar,
+            color: item.color,
+            matchScore: item.score,
+            budget: item.budget ?? "Menunggu kesepakatan",
+          })
+        }
       />
     </FeaturePage>
   );

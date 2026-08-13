@@ -4,19 +4,19 @@ import { LayoutDashboard, MoreHorizontal, CheckCircle, Clock, AlertCircle, FileT
 import FeaturePage from "@/components/dashboard/FeaturePage";
 
 const campaigns = [
-  { brand: "Kopi Nusantara", type: "Instagram & TikTok", brief: "Promosi produk kopi premium", budget: "Rp 4 Jt", status: "Berlangsung", deadline: "5 hari", progress: 60, color: "emerald" },
-  { brand: "Skincare Glowing", type: "YouTube Video", brief: "Review skincare lengkap", budget: "Rp 5 Jt", status: "Review", deadline: "2 hari", progress: 85, color: "amber" },
-  { brand: "TechGadget ID", type: "TikTok", brief: "Unboxing & review gadget", budget: "Rp 7 Jt", status: "Diterima", deadline: "14 hari", progress: 15, color: "blue" },
+  { brand: "Kopi Nusantara", type: "Instagram & TikTok", brief: "Promosi produk kopi premium", budget: "Rp 4 Jt", status: "Review", deadline: "5 hari", progress: 60, color: "emerald" },
+  { brand: "Skincare Glowing", type: "YouTube Video", brief: "Review skincare lengkap", budget: "Rp 5 Jt", status: "Produksi", deadline: "2 hari", progress: 85, color: "amber" },
+  { brand: "TechGadget ID", type: "TikTok", brief: "Unboxing & review gadget", budget: "Rp 7 Jt", status: "Dikonfirmasi", deadline: "14 hari", progress: 15, color: "blue" },
   { brand: "Sporty Apparel", type: "Instagram", brief: "Promo koleksi olahraga", budget: "Rp 2,5 Jt", status: "Selesai", deadline: "Selesai", progress: 100, color: "emerald" },
   { brand: "Bali Retreat", type: "Instagram & TikTok", brief: "Viral challenge campaign", budget: "Rp 6 Jt", status: "Negosiasi", deadline: "-", progress: 0, color: "purple" },
 ];
 
 const statusStyles: Record<string, string> = {
-  Berlangsung: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
-  Review: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-  Diterima: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-  Selesai: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400",
   Negosiasi: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
+  Dikonfirmasi: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
+  Produksi: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400",
+  Review: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+  Selesai: "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400",
 };
 
 const progressColors: Record<string, string> = {
@@ -36,7 +36,7 @@ export default function Campaigns() {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {["Semua", "Berlangsung", "Review", "Selesai"].map((s) => (
+          {["Semua", "Negosiasi", "Dikonfirmasi", "Produksi", "Review", "Selesai"].map((s) => (
             <button key={s} className={`px-4 py-2 rounded-full text-xs font-medium transition-all ${s === "Semua" ? "bg-kolabora text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}>{s}</button>
           ))}
         </div>

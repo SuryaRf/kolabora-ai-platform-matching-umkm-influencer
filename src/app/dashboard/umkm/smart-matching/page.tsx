@@ -3,6 +3,7 @@
 import { Zap, Users, Heart, MapPin, Star } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
 import OneByOneMatch, { type MatchItem } from "@/components/dashboard/OneByOneMatch";
+import { useCollaborations } from "@/lib/collaborations";
 
 const influencers: MatchItem[] = [
   {
@@ -122,6 +123,8 @@ const influencers: MatchItem[] = [
 ];
 
 export default function UMKMSmartMatching() {
+  const { addCollaboration } = useCollaborations("umkm");
+
   return (
     <FeaturePage
       title="AI Smart Matching"
@@ -133,7 +136,18 @@ export default function UMKMSmartMatching() {
         items={influencers}
         noun="influencer"
         ctaLabel="Ajukan Kolaborasi"
-        ctaSuccess="Kolaborasi berhasil dikirim. Pantau konfirmasi influencer di menu Chat & Collaboration."
+        ctaSuccess="Kolaborasi berhasil dikirim. Pantau progresnya di menu Riwayat Kolaborasi."
+        historyHref="/dashboard/umkm/history"
+        onMatch={(item) =>
+          addCollaboration({
+            name: item.name,
+            subtitle: item.subtitle,
+            avatar: item.avatar,
+            color: item.color,
+            matchScore: item.score,
+            budget: "Menunggu kesepakatan",
+          })
+        }
       />
     </FeaturePage>
   );

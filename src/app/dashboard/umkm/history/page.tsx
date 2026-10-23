@@ -3,5 +3,5 @@
 import CollaborationHistory from "@/components/dashboard/CollaborationHistory";
 
 export default function UMKMCollaborationHistory() {
-  return <CollaborationHistory role="umkm" />;
+  return <CollaborationHistory role="UMKM" />;
 }

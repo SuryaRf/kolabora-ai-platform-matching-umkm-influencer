@@ -1,107 +1,289 @@
 "use client";
 
-import Link from "next/link";
-import { PieChart, Users, Heart, Eye, TrendingUp, Camera, Video, Music2, Globe, ExternalLink, Star, ArrowRight } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Camera,
+  ExternalLink,
+  Image as ImageIcon,
+  Loader2,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
+import Modal from "@/components/ui/Modal";
 
-const platformStats = [
-  { icon: Camera, name: "Instagram", followers: "45.2K", engagement: "6.8%", posts: "342", color: "bg-pink-500" },
-  { icon: Music2, name: "TikTok", followers: "78.1K", engagement: "8.2%", posts: "156", color: "bg-zinc-800" },
-  { icon: Video, name: "YouTube", followers: "12.3K", engagement: "4.5%", videos: "89", color: "bg-red-500" },
-];
+interface PortfolioItem {
+  id: string;
+  title: string;
+  imageUrl: string;
+  link: string | null;
+  createdAt: string;
+}
 
-const pastCampaigns = [
-  { brand: "Kopi Nusantara", platform: "Instagram & TikTok", reach: "45.2K", engagement: "6.2K", rate: "4.8%", rating: 4.9, status: "Selesai" },
-  { brand: "Skincare Glowing", platform: "Instagram", reach: "32.1K", engagement: "4.8K", rate: "5.2%", rating: 4.8, status: "Selesai" },
-  { brand: "TechGadget ID", platform: "YouTube & TikTok", reach: "78.3K", engagement: "8.9K", rate: "3.8%", rating: 4.7, status: "Selesai" },
-  { brand: "Sporty Apparel", platform: "Instagram", reach: "28.4K", engagement: "3.2K", rate: "4.1%", rating: 4.5, status: "Berlangsung" },
-];
+interface Profile {
+  influencerProfile: {
+    displayName: string;
+    followers: number;
+    engagement: number;
+    category: string;
+  } | null;
+}
 
-export default function Portfolio() {
+export default function PortfolioPage() {
+  const [items, setItems] = useState<PortfolioItem[]>([]);
+  const [profile, setProfile] = useState<Profile["influencerProfile"]>(null);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [title, setTitle] = useState("");
+  const [link, setLink] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [portfolioRes, profileRes] = await Promise.all([
+        fetch("/api/portfolio", { cache: "no-store" }),
+        fetch("/api/profile", { cache: "no-store" }),
+      ]);
+      if (portfolioRes.ok) setItems(await portfolioRes.json());
+      if (profileRes.ok) {
+        const data: Profile = await profileRes.json();
+        setProfile(data.influencerProfile);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const resetForm = () => {
+    setTitle("");
+    setLink("");
+    setImageUrl("");
+    setFile(null);
+    setError("");
+  };
+
+  const submit = async () => {
+    if (!title) return;
+    setSaving(true);
+    setError("");
+    try {
+      let res: Response;
+      if (file) {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("title", title);
+        if (link) body.append("link", link);
+        res = await fetch("/api/portfolio", { method: "POST", body });
+      } else {
+        res = await fetch("/api/portfolio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, link, imageUrl }),
+        });
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Gagal menambah portfolio");
+        return;
+      }
+      setOpen(false);
+      resetForm();
+      await load();
+    } catch {
+      setError("Gagal menambah portfolio");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm("Hapus item portfolio ini?")) return;
+    await fetch(`/api/portfolio?id=${id}`, { method: "DELETE" });
+    await load();
+  };
+
   return (
     <FeaturePage
-      title="Portfolio & Performance Dashboard"
-      description="Dasbor yang menampilkan portofolio digital, statistik performa media sosial, dan histori campaign."
-      icon={PieChart}
-      gradient="bg-kolabora"
+      title="Portfolio & Performance"
+      description="Tampilkan karya terbaik Anda. Portfolio membantu brand menilai kualitas konten sebelum mengajak kolaborasi."
+      icon={Camera}
+      gradient="bg-influencer"
     >
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          { icon: Users, label: "Total Followers", value: "135.6K" },
-          { icon: Heart, label: "Total Engagement", value: "28.4K" },
-          { icon: Eye, label: "Total Reach (30d)", value: "245.6K" },
-          { icon: TrendingUp, label: "Avg. Engagement Rate", value: "6.5%" },
-        ].map((s, i) => (
-          <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <s.icon className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-500">{s.label}</span>
+      {profile && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Followers", value: profile.followers.toLocaleString("id-ID") },
+            { label: "Engagement", value: `${profile.engagement}%` },
+            { label: "Kategori", value: profile.category },
+            { label: "Karya", value: String(items.length) },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4"
+            >
+              <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
+              <p className="text-sm font-bold truncate">{s.value}</p>
             </div>
-            <p className="text-xl font-bold">{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {platformStats.map((p, i) => (
-          <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-xl ${p.color} flex items-center justify-center`}>
-                <p.icon className="w-5 h-5 text-white" />
-              </div>
-              <p className="font-semibold">{p.name}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800">
-                <Users className="w-3.5 h-3.5 mx-auto mb-0.5 text-zinc-400" />
-                <span className="text-zinc-600 dark:text-zinc-400 font-medium">{p.followers}</span>
-              </div>
-              <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800">
-                <Heart className="w-3.5 h-3.5 mx-auto mb-0.5 text-zinc-400" />
-                <span className="text-zinc-600 dark:text-zinc-400 font-medium">{p.engagement}</span>
-              </div>
-              <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800">
-                <Globe className="w-3.5 h-3.5 mx-auto mb-0.5 text-zinc-400" />
-                <span className="text-zinc-600 dark:text-zinc-400 font-medium">{p.posts || p.videos}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-sm">Riwayat Kolaborasi</h3>
-          <Link href="/dashboard/influencer/history" className="text-xs text-kolabora hover:underline flex items-center gap-1">
-            Lihat Alur Kolaborasi <ArrowRight className="w-3 h-3" />
-          </Link>
+          ))}
         </div>
-        <div className="space-y-3">
-          {pastCampaigns.map((pc, i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                  <ExternalLink className="w-4 h-4 text-zinc-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{pc.brand}</p>
-                  <p className="text-xs text-zinc-500">{pc.platform}</p>
-                </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sm">Karya Saya</h3>
+        <button
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-influencer hover:bg-influencer-dark"
+        >
+          <Plus className="w-4 h-4" /> Tambah Karya
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-sm text-zinc-500">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Memuat portfolio...
+        </div>
+      ) : items.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center">
+          <ImageIcon className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+          <h3 className="font-semibold">Portfolio masih kosong</h3>
+          <p className="text-sm text-zinc-500 mt-1 mb-5">
+            Unggah foto atau tautan konten terbaik Anda untuk menarik brand.
+          </p>
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-influencer"
+          >
+            <Plus className="w-4 h-4" /> Tambah Karya
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+            >
+              <div className="aspect-video bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                />
               </div>
-              <div className="flex items-center gap-4 text-xs text-zinc-500">
-                <span>Reach: {pc.reach}</span>
-                <span>Eng: {pc.engagement}</span>
-                <span className="font-semibold text-kolabora">{pc.rate}</span>
-                <div className="flex items-center gap-0.5">
-                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span className="font-semibold">{pc.rating}</span>
+              <div className="p-4">
+                <p className="font-medium text-sm truncate">{item.title}</p>
+                <div className="flex items-center justify-between mt-2">
+                  {item.link ? (
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-kolabora hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Lihat karya
+                    </a>
+                  ) : (
+                    <span className="text-xs text-zinc-400">Tanpa tautan</span>
+                  )}
+                  <button
+                    onClick={() => void remove(item.id)}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    aria-label="Hapus"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${pc.status === "Selesai" ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"}`}>{pc.status}</span>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
+
+      <Modal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          resetForm();
+        }}
+        title="Tambah Karya Portfolio"
+        description="Unggah gambar atau tempel URL gambar publik."
+      >
+        <div className="space-y-4">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium mb-1.5">
+              Judul Karya
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Review produk skincare — 120K views"
+              className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-influencer/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5">
+              Unggah Gambar
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="w-full text-xs file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-influencer/10 file:text-influencer"
+            />
+            <p className="text-[10px] text-zinc-400 mt-1">
+              Butuh Vercel Blob. Jika belum dikonfigurasi, gunakan URL gambar.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5">
+              URL Gambar
+            </label>
+            <input
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-influencer/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5">
+              Tautan Karya (opsional)
+            </label>
+            <input
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://instagram.com/p/..."
+              className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-influencer/50"
+            />
+          </div>
+          <button
+            onClick={() => void submit()}
+            disabled={saving || !title || (!file && !imageUrl)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-influencer hover:bg-influencer-dark disabled:opacity-50"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            Simpan Karya
+          </button>
+        </div>
+      </Modal>
     </FeaturePage>
   );
 }

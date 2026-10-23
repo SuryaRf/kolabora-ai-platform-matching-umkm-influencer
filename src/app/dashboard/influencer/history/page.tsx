@@ -3,5 +3,5 @@
 import CollaborationHistory from "@/components/dashboard/CollaborationHistory";
 
 export default function InfluencerCollaborationHistory() {
-  return <CollaborationHistory role="influencer" />;
+  return <CollaborationHistory role="INFLUENCER" />;
 }

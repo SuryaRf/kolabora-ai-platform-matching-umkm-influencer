@@ -1,13 +1,62 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Lock, Store, Camera, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Store, Camera, Eye, EyeOff, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
-  const [role, setRole] = useState<"umkm" | "influencer" | null>(null);
+  const router = useRouter();
+  const [role, setRole] = useState<"UMKM" | "INFLUENCER" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [category, setCategory] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!role) {
+      setError("Pilih peran Anda terlebih dahulu");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          role,
+          businessName: role === "UMKM" ? businessName : undefined,
+          displayName: role === "INFLUENCER" ? displayName : undefined,
+          category,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Pendaftaran gagal");
+      } else {
+        router.push("/login?registered=true");
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-zinc-50 to-white dark:from-zinc-950 dark:to-black">
@@ -35,21 +84,21 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setRole("umkm")}
+                  onClick={() => setRole("UMKM")}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                    role === "umkm"
+                    role === "UMKM"
                       ? "border-umkm bg-amber-50 dark:bg-amber-900/20"
                       : "border-zinc-200 dark:border-zinc-700 hover:border-umkm/50"
                   }`}
                 >
                   <Store
                     className={`w-6 h-6 ${
-                      role === "umkm" ? "text-umkm" : "text-zinc-400"
+                      role === "UMKM" ? "text-umkm" : "text-zinc-400"
                     }`}
                   />
                   <span
                     className={`text-xs font-medium ${
-                      role === "umkm" ? "text-umkm" : "text-zinc-500"
+                      role === "UMKM" ? "text-umkm" : "text-zinc-500"
                     }`}
                   >
                     UMKM
@@ -57,21 +106,21 @@ export default function RegisterPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRole("influencer")}
+                  onClick={() => setRole("INFLUENCER")}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                    role === "influencer"
+                    role === "INFLUENCER"
                       ? "border-influencer bg-rose-50 dark:bg-rose-900/20"
                       : "border-zinc-200 dark:border-zinc-700 hover:border-influencer/50"
                   }`}
                 >
                   <Camera
                     className={`w-6 h-6 ${
-                      role === "influencer" ? "text-influencer" : "text-zinc-400"
+                      role === "INFLUENCER" ? "text-influencer" : "text-zinc-400"
                     }`}
                   />
                   <span
                     className={`text-xs font-medium ${
-                      role === "influencer"
+                      role === "INFLUENCER"
                         ? "text-influencer"
                         : "text-zinc-500"
                     }`}
@@ -82,28 +131,69 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">
+                  Nama Lengkap
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nama Lengkap"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 focus:border-kolabora transition-colors"
+                />
+              </div>
+
+              {role === "UMKM" && (
                 <div>
                   <label className="block text-sm font-medium mb-1.5">
-                    Nama Depan
+                    Nama Usaha / Bisnis
                   </label>
                   <input
                     type="text"
-                    placeholder="Nama"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder="Nama Brand / Toko"
+                    required
                     className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 focus:border-kolabora transition-colors"
                   />
                 </div>
+              )}
+
+              {role === "INFLUENCER" && (
                 <div>
                   <label className="block text-sm font-medium mb-1.5">
-                    Nama Belakang
+                    Username / Display Name
                   </label>
                   <input
                     type="text"
-                    placeholder="Belakang"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="@username"
+                    required
                     className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 focus:border-kolabora transition-colors"
                   />
                 </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">
+                  Kategori
+                </label>
+                <input
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="Contoh: Kuliner, Fashion, Gadget"
+                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 focus:border-kolabora transition-colors"
+                />
               </div>
 
               <div>
@@ -114,7 +204,10 @@ export default function RegisterPage() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="nama@email.com"
+                    required
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 focus:border-kolabora transition-colors"
                   />
                 </div>
@@ -128,7 +221,11 @@ export default function RegisterPage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
                     type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="Min. 8 karakter"
+                    required
+                    minLength={8}
                     className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 focus:border-kolabora transition-colors"
                   />
                   <button
@@ -145,12 +242,13 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <Link
-                href="/dashboard"
-                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-kolabora hover:bg-kolabora-dark transition-all shadow-lg shadow-kolabora/25"
+              <button
+                type="submit"
+                disabled={loading}
+                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-kolabora hover:bg-kolabora-dark transition-all shadow-lg shadow-kolabora/25 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Buat Akun
-              </Link>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Buat Akun"}
+              </button>
             </form>
 
             <p className="text-center text-xs text-zinc-500 mt-6">

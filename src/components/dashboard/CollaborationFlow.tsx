@@ -14,7 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { CollaborationRole } from "@/lib/collaborations";
+import type { Role as CollaborationRole } from "@/lib/collab";
 
 export interface FlowStage {
   key: string;
@@ -34,64 +34,64 @@ const STAGE_DEFINITIONS: StageDefinition[] = [
   {
     key: "matching",
     icon: Zap,
-    label: { umkm: "AI Smart Matching", influencer: "AI Smart Matching" },
+    label: { UMKM: "AI Smart Matching", INFLUENCER: "AI Smart Matching" },
     description: {
-      umkm: "AI merekomendasikan influencer paling cocok berdasarkan profil, niche, lokasi, audiens, dan performa.",
-      influencer: "AI merekomendasikan campaign paling cocok dengan profil, niche, tarif, dan jangkauan Anda.",
+      UMKM: "AI merekomendasikan influencer paling cocok berdasarkan profil, niche, lokasi, audiens, dan performa.",
+      INFLUENCER: "AI merekomendasikan campaign paling cocok dengan profil, niche, tarif, dan jangkauan Anda.",
     },
   },
   {
     key: "proposal",
     icon: Send,
-    label: { umkm: "Ajukan Kolaborasi", influencer: "Terima Tawaran" },
+    label: { UMKM: "Ajukan Kolaborasi", INFLUENCER: "Terima Tawaran" },
     description: {
-      umkm: "Proposal kolaborasi dikirim ke influencer lengkap dengan detail brief dan penawaran.",
-      influencer: "Anda mengajukan diri ke campaign atau menerima tawaran kolaborasi dari brand.",
+      UMKM: "Proposal kolaborasi dikirim ke influencer lengkap dengan detail brief dan penawaran.",
+      INFLUENCER: "Anda mengajukan diri ke campaign atau menerima tawaran kolaborasi dari brand.",
     },
   },
   {
     key: "negotiation",
     icon: MessageSquare,
-    label: { umkm: "Diskusi & Negosiasi", influencer: "Diskusi & Negosiasi" },
+    label: { UMKM: "Diskusi & Negosiasi", INFLUENCER: "Diskusi & Negosiasi" },
     description: {
-      umkm: "Kedua pihak berdiskusi via Chat untuk menyepakati brief, tarif, dan konsep konten.",
-      influencer: "Anda berdiskusi dengan brand via Chat untuk menyepakati brief, tarif, dan konsep konten.",
+      UMKM: "Kedua pihak berdiskusi via Chat untuk menyepakati brief, tarif, dan konsep konten.",
+      INFLUENCER: "Anda berdiskusi dengan brand via Chat untuk menyepakati brief, tarif, dan konsep konten.",
     },
   },
   {
     key: "agreement",
     icon: Handshake,
-    label: { umkm: "Konfirmasi & Escrow", influencer: "Setujui & Escrow" },
+    label: { UMKM: "Konfirmasi & Escrow", INFLUENCER: "Setujui & Escrow" },
     description: {
-      umkm: "Deal dikonfirmasi dan dana campaign diamankan di sistem escrow sebagai jaminan.",
-      influencer: "Anda menyetujui kesepakatan brand; dana campaign dikunci di sistem escrow.",
+      UMKM: "Deal dikonfirmasi dan dana campaign diamankan di sistem escrow sebagai jaminan.",
+      INFLUENCER: "Anda menyetujui kesepakatan brand; dana campaign dikunci di sistem escrow.",
     },
   },
   {
     key: "production",
     icon: PenTool,
-    label: { umkm: "Produksi Konten", influencer: "Produksi Konten" },
+    label: { UMKM: "Produksi Konten", INFLUENCER: "Produksi Konten" },
     description: {
-      umkm: "Influencer memproduksi konten sesuai brief yang telah disepakati.",
-      influencer: "Anda memproduksi konten sesuai brief yang telah disepakati dengan brand.",
+      UMKM: "Influencer memproduksi konten sesuai brief yang telah disepakati.",
+      INFLUENCER: "Anda memproduksi konten sesuai brief yang telah disepakati dengan brand.",
     },
   },
   {
     key: "review",
     icon: Eye,
-    label: { umkm: "Review & Persetujuan", influencer: "Persetujuan Brand" },
+    label: { UMKM: "Review & Persetujuan", INFLUENCER: "Persetujuan Brand" },
     description: {
-      umkm: "Brand meninjau konten di Review Campaign — setujui atau minta revisi.",
-      influencer: "Brand meninjau konten Anda di Review Campaign — disetujui atau minta revisi.",
+      UMKM: "Brand meninjau konten di Review Campaign — setujui atau minta revisi.",
+      INFLUENCER: "Brand meninjau konten Anda di Review Campaign — disetujui atau minta revisi.",
     },
   },
   {
     key: "completion",
     icon: Banknote,
-    label: { umkm: "Publikasi & Pembayaran", influencer: "Publikasi & Pembayaran" },
+    label: { UMKM: "Publikasi & Pembayaran", INFLUENCER: "Publikasi & Pembayaran" },
     description: {
-      umkm: "Konten tayang, dana escrow dicairkan otomatis, dan performa dianalisis di Analytics.",
-      influencer: "Konten tayang, dana escrow dicairkan ke Anda, dan performa dianalisis di Analytics.",
+      UMKM: "Konten tayang, dana escrow dicairkan otomatis, dan performa dianalisis di Analytics.",
+      INFLUENCER: "Konten tayang, dana escrow dicairkan ke Anda, dan performa dianalisis di Analytics.",
     },
   },
 ];
@@ -109,7 +109,7 @@ const STAGE_STATUS: Record<
   CollaborationRole,
   Record<string, { label: string; className: string }>
 > = {
-  umkm: {
+  UMKM: {
     matching: {
       label: "Menunggu Ajuan",
       className:
@@ -146,7 +146,7 @@ const STAGE_STATUS: Record<
         "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
     },
   },
-  influencer: {
+  INFLUENCER: {
     matching: {
       label: "Menunggu Tawaran",
       className:

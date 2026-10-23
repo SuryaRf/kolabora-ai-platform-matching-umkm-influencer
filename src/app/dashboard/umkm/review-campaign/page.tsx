@@ -1,165 +1,371 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle, Clock, AlertCircle, FileText, Eye, Download, MessageSquare, ThumbsUp, Sparkles, ArrowRight, XCircle, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  CheckCircle2,
+  Clock,
+  Eye,
+  FileText,
+  Loader2,
+  MessageSquare,
+  RotateCcw,
+  ThumbsUp,
+  XCircle,
+} from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
+import Modal from "@/components/ui/Modal";
+import { formatDate } from "@/lib/utils";
+import { colorForName, initialsOf } from "@/lib/avatar";
 
-const reviewItems = [
-  {
-    brand: "Kopi Nusantara",
-    influencer: "Kuliner Jalanan",
-    platform: "Instagram & TikTok",
-    deadline: "2 hari lagi",
-    status: "review",
-    content: [
-      { type: "caption", status: "approved", note: "Caption sesuai brief" },
-      { type: "visual", status: "pending", note: "Menunggu revisi色调" },
-      { type: "hashtag", status: "approved", note: "Semua hashtag tercantum" },
-      { type: "disclosure", status: "pending", note: "Perlu tambahkan #ad" },
-    ],
-  },
-  {
-    brand: "Skincare Glowing",
-    influencer: "Sarah Beauty",
-    platform: "YouTube",
-    deadline: "Besok",
-    status: "pending",
-    content: [
-      { type: "video", status: "pending", note: "Video sedang di-render" },
-      { type: "caption", status: "pending", note: "Menunggu upload" },
-    ],
-  },
-  {
-    brand: "Batik Nusantara",
-    influencer: "Traveler Indo",
-    platform: "TikTok",
-    deadline: "Selesai",
-    status: "completed",
-    content: [
-      { type: "video", status: "approved", note: "Konten sesuai ekspektasi" },
-      { type: "caption", status: "approved", note: "Caption dan CTA sesuai" },
-      { type: "hashtag", status: "approved", note: "Lengkap" },
-    ],
-  },
-];
+interface Review {
+  id: string;
+  collaborationId: string;
+  contentUrl: string;
+  caption: string | null;
+  notes: string | null;
+  status: string;
+  reviewNotes: string | null;
+  submittedAt: string;
+  reviewedAt: string | null;
+  collaboration: {
+    id: string;
+    title: string;
+    status: string;
+    campaign: { id: string; title: string } | null;
+    participants: {
+      id: string;
+      name: string | null;
+      role: string | null;
+      image: string | null;
+    }[];
+  };
+}
 
-const statusConfig = {
-  review: { icon: Clock, label: "Perlu Review", color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20 border-amber-200" },
-  pending: { icon: AlertCircle, label: "Menunggu", color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20 border-blue-200" },
-  completed: { icon: CheckCircle, label: "Selesai", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200" },
+const STATUS_META: Record<
+  string,
+  { label: string; className: string; icon: typeof Clock }
+> = {
+  PENDING: {
+    label: "Menunggu Review",
+    className:
+      "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+    icon: Clock,
+  },
+  APPROVED: {
+    label: "Disetujui",
+    className:
+      "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
+    icon: CheckCircle2,
+  },
+  REVISION_REQUESTED: {
+    label: "Revisi Diminta",
+    className: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+    icon: RotateCcw,
+  },
 };
 
-export default function ReviewCampaign() {
-  const [selected, setSelected] = useState(0);
+export default function ReviewCampaignPage() {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"semua" | "pending" | "done">("semua");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [revisionTarget, setRevisionTarget] = useState<Review | null>(null);
+  const [revisionNotes, setRevisionNotes] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/reviews", { cache: "no-store" });
+      if (res.ok) setReviews(await res.json());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const pending = reviews.filter((r) => r.status === "PENDING");
+
+  const visible = useMemo(
+    () =>
+      reviews.filter((r) => {
+        if (filter === "pending") return r.status === "PENDING";
+        if (filter === "done") return r.status !== "PENDING";
+        return true;
+      }),
+    [reviews, filter],
+  );
+
+  const review = async (
+    reviewId: string,
+    action: "approve" | "revision",
+    notes?: string,
+  ) => {
+    setBusyId(reviewId);
+    setError("");
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId, action, reviewNotes: notes }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Gagal memproses review");
+        return;
+      }
+      setNotice(
+        action === "approve"
+          ? "Konten disetujui. Dana escrow kini siap dicairkan di Riwayat Kolaborasi."
+          : "Permintaan revisi dikirim ke influencer.",
+      );
+      setRevisionTarget(null);
+      setRevisionNotes("");
+      await load();
+    } catch {
+      setError("Gagal memproses review");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <FeaturePage
-      title="Review Campaign"
-      description="Tinjau hasil konten sebelum dipublikasikan dan konfirmasi penyelesaian campaign sebagai dasar pencairan dana melalui sistem escrow."
+      title="Review Konten"
+      description="Tinjau konten yang dikirim influencer. Setujui untuk melanjutkan pencairan escrow, atau minta revisi dengan catatan yang jelas."
       icon={Eye}
-      gradient="bg-gradient-to-br from-purple-500 to-indigo-600"
+      gradient="bg-umkm"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          {reviewItems.map((item, idx) => {
-            const cfg = statusConfig[item.status as keyof typeof statusConfig];
-            const Icon = cfg.icon;
+      {notice && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 text-sm text-emerald-700 dark:text-emerald-400">
+          <CheckCircle2 className="w-4 h-4" /> {notice}
+        </div>
+      )}
+      {error && (
+        <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { label: "Menunggu Review", value: pending.length, icon: Clock },
+          {
+            label: "Disetujui",
+            value: reviews.filter((r) => r.status === "APPROVED").length,
+            icon: CheckCircle2,
+          },
+          {
+            label: "Perlu Revisi",
+            value: reviews.filter((r) => r.status === "REVISION_REQUESTED")
+              .length,
+            icon: XCircle,
+          },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+              <s.icon className="w-5 h-5 text-zinc-500" />
+            </div>
+            <div>
+              <p className="text-xl font-bold">{s.value}</p>
+              <p className="text-xs text-zinc-500">{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        {[
+          { key: "semua" as const, label: "Semua" },
+          { key: "pending" as const, label: "Menunggu Review" },
+          { key: "done" as const, label: "Sudah Direview" },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-4 py-2 rounded-full text-xs font-medium transition-all ${
+              filter === f.key
+                ? "bg-umkm text-white"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-sm text-zinc-500">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Memuat konten...
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center">
+          <Eye className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+          <h3 className="font-semibold">Belum ada konten untuk direview</h3>
+          <p className="text-sm text-zinc-500 mt-1">
+            Konten akan muncul di sini setelah influencer mengirimkannya.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {visible.map((r) => {
+            const meta = STATUS_META[r.status] ?? STATUS_META.PENDING;
+            const Icon = meta.icon;
+            const influencer = r.collaboration.participants.find(
+              (p) => p.role === "INFLUENCER",
+            );
+            const name = influencer?.name ?? "Influencer";
             return (
               <div
-                key={idx}
-                onClick={() => setSelected(idx)}
-                className={`bg-white dark:bg-zinc-900 rounded-2xl border-2 p-5 cursor-pointer transition-all ${
-                  selected === idx ? "border-purple-500 shadow-lg" : "border-zinc-200 dark:border-zinc-700 hover:border-purple-500/50"
-                }`}
+                key={r.id}
+                className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold">{item.brand}</h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {item.influencer} • {item.platform}
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <div
+                    className={`w-11 h-11 rounded-full ${colorForName(
+                      name,
+                    )} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden`}
+                  >
+                    {influencer?.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={influencer.image}
+                        alt={name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      initialsOf(name)
+                    )}
                   </div>
-                  <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
-                    <Icon className="w-3 h-3" />
-                    {cfg.label}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  {item.content.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800">
-                      <div className="flex items-center gap-2">
-                        {c.status === "approved" ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        ) : c.status === "pending" ? (
-                          <Clock className="w-4 h-4 text-amber-500" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-red-500" />
-                        )}
-                        <span className="text-xs capitalize font-medium">{c.type}</span>
-                      </div>
-                      <span className={`text-xs ${c.status === "approved" ? "text-emerald-600" : c.status === "pending" ? "text-amber-600" : "text-red-600"}`}>
-                        {c.note}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold">{r.collaboration.title}</p>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${meta.className}`}
+                      >
+                        <Icon className="w-3 h-3" /> {meta.label}
                       </span>
                     </div>
-                  ))}
-                </div>
+                    <p className="text-xs text-zinc-500">
+                      {name} • Dikirim {formatDate(r.submittedAt)}
+                    </p>
 
-                {item.status === "review" && (
-                  <div className="flex items-center gap-3 mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                    <button className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5">
-                      <ThumbsUp className="w-3.5 h-3.5" /> Setujui & Konfirmasi
-                    </button>
-                    <button className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:text-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all flex items-center justify-center gap-1.5">
-                      <MessageSquare className="w-3.5 h-3.5" /> Minta Revisi
-                    </button>
-                  </div>
-                )}
-
-                {item.status === "completed" && (
-                  <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle className="w-5 h-5" />
-                      <span className="text-sm font-medium">Campaign selesai — dana akan dicairkan ke influencer</span>
+                    <div className="mt-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                        <FileText className="w-3.5 h-3.5" /> Konten
+                      </div>
+                      <a
+                        href={r.contentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-kolabora hover:underline break-all"
+                      >
+                        {r.contentUrl}
+                      </a>
+                      {r.caption && (
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                          <span className="font-semibold">Caption:</span>{" "}
+                          {r.caption}
+                        </p>
+                      )}
+                      {r.notes && (
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                          <span className="font-semibold">Catatan:</span>{" "}
+                          {r.notes}
+                        </p>
+                      )}
+                      {r.reviewNotes && (
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                          <span className="font-semibold">Catatan review:</span>{" "}
+                          {r.reviewNotes}
+                        </p>
+                      )}
                     </div>
                   </div>
-                )}
+
+                  {r.status === "PENDING" && (
+                    <div className="flex sm:flex-col gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => void review(r.id, "approve")}
+                        disabled={busyId === r.id}
+                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {busyId === r.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        )}
+                        Setujui
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRevisionTarget(r);
+                          setRevisionNotes("");
+                        }}
+                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Minta Revisi
+                      </button>
+                      <Link
+                        href="/dashboard/umkm/chat"
+                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-kolabora bg-kolabora/10 hover:bg-kolabora/20"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" /> Diskusi
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
+      )}
 
+      <Modal
+        open={!!revisionTarget}
+        onClose={() => setRevisionTarget(null)}
+        title="Minta Revisi Konten"
+        description={revisionTarget?.collaboration.title}
+      >
         <div className="space-y-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
-            <h3 className="font-semibold text-sm mb-3">Ringkasan Review</h3>
-            <div className="space-y-3">
-              {[
-                { icon: CheckCircle, label: "Konten Disetujui", value: "4", color: "text-emerald-500" },
-                { icon: Clock, label: "Menunggu Review", value: "3", color: "text-amber-500" },
-                { icon: AlertTriangle, label: "Perlu Revisi", value: "2", color: "text-red-500" },
-              ].map((s, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800">
-                  <div className="flex items-center gap-2">
-                    <s.icon className={`w-4 h-4 ${s.color}`} />
-                    <span className="text-xs text-zinc-500">{s.label}</span>
-                  </div>
-                  <span className="text-sm font-semibold">{s.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-zinc-800 dark:to-zinc-800 rounded-2xl border border-purple-200 dark:border-zinc-700 p-5">
-            <h3 className="font-semibold text-sm mb-2">Sistem Escrow</h3>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-              Dana campaign diamankan dalam sistem escrow dan akan dicairkan ke influencer setelah konten disetujui dan dikonfirmasi oleh kedua belah pihak.
-            </p>
-            <div className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 font-medium">
-              <Sparkles className="w-3.5 h-3.5" /> Pembayaran aman & transparan
-            </div>
-          </div>
+          <p className="text-xs text-zinc-500">
+            Jelaskan bagian yang perlu diperbaiki agar influencer dapat segera
+            melakukan revisi.
+          </p>
+          <textarea
+            rows={5}
+            value={revisionNotes}
+            onChange={(e) => setRevisionNotes(e.target.value)}
+            placeholder="Contoh: Perbaiki pencahayaan pada 5 detik pertama dan tambahkan hashtag #ad."
+            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
+          />
+          <button
+            onClick={() =>
+              revisionTarget &&
+              void review(revisionTarget.id, "revision", revisionNotes)
+            }
+            disabled={
+              !revisionNotes.trim() ||
+              (revisionTarget ? busyId === revisionTarget.id : false)
+            }
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-umkm hover:bg-umkm-dark disabled:opacity-50"
+          >
+            {busyId === revisionTarget?.id ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4" />
+            )}
+            Kirim Permintaan Revisi
+          </button>
         </div>
-      </div>
+      </Modal>
     </FeaturePage>
   );
 }

@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   History,
+  Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -42,7 +43,12 @@ interface OneByOneMatchProps {
   ctaLabel: string;
   ctaSuccess: string;
   historyHref?: string;
-  onMatch?: (item: MatchItem) => void;
+  /**
+   * Called when the user taps the CTA. Return `false` to keep the current card
+   * (e.g. the user cancelled the follow-up dialog) or `true`/undefined to move
+   * on to the next candidate.
+   */
+  onMatch?: (item: MatchItem) => boolean | Promise<boolean> | void;
 }
 
 export default function OneByOneMatch({
@@ -56,6 +62,7 @@ export default function OneByOneMatch({
   const [index, setIndex] = useState(0);
   const [matched, setMatched] = useState<number[]>([]);
   const [justMatched, setJustMatched] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const done = index >= items.length;
   const current = done ? null : items[index];
@@ -73,12 +80,18 @@ export default function OneByOneMatch({
     setIndex((i) => i + 1);
   };
 
-  const handleMatch = () => {
-    if (!current) return;
-    setMatched((m) => [...m, index]);
-    setJustMatched(current.name);
-    setIndex((i) => i + 1);
-    onMatch?.(current);
+  const handleMatch = async () => {
+    if (!current || pending) return;
+    setPending(true);
+    try {
+      const result = await onMatch?.(current);
+      if (result === false) return;
+      setMatched((m) => [...m, index]);
+      setJustMatched(current.name);
+      setIndex((i) => i + 1);
+    } finally {
+      setPending(false);
+    }
   };
 
   const reset = () => {
@@ -269,10 +282,16 @@ export default function OneByOneMatch({
                   <X className="w-4 h-4" /> Find Next
                 </button>
                 <button
-                  onClick={handleMatch}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-kolabora hover:bg-kolabora-dark transition-all"
+                  onClick={() => void handleMatch()}
+                  disabled={pending}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-kolabora hover:bg-kolabora-dark transition-all disabled:opacity-50"
                 >
-                  <Send className="w-4 h-4" /> {ctaLabel}
+                  {pending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}{" "}
+                  {ctaLabel}
                 </button>
               </div>
             </div>

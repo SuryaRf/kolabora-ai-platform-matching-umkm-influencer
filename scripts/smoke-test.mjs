@@ -10,7 +10,8 @@
  *   lamar -> terima lamaran -> accept (INFLUENCER) -> agree -> hold_escrow (UMKM)
  *   -> start_production (INFLUENCER) -> kirim konten (POST /api/reviews)
  *   -> approve (PATCH /api/reviews) -> complete/lepas escrow (UMKM)
- * plus endpoint AI dan pemanggilan halaman utama.
+ * plus endpoint AI, endpoint insight berbasis data asli, penjaga peran,
+ * undangan kolaborasi dari halaman Highlights, dan pemanggilan seluruh halaman.
  */
 
 const BASE = (process.env.BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
@@ -232,10 +233,193 @@ async function main() {
   const brief = await umkm.request("/api/ai/brief", { method: "POST", body: { prompt: "Beri 3 ide konten promosi kopi susu bulan ini", mode: "ide" } });
   check("AI asisten UMKM", [200, 503, 429].includes(brief.status), brief.status === 429 ? "kuota AI habis (pengujian berulang)" : `status=${brief.status} ${String(brief.json?.error ?? "").slice(0, 60)}`);
 
+  // ---- insight & halaman berbasis data asli ----
+  // (dijalankan sebelum uji kuota, supaya jalur 200 sempat teriksa)
+  const infInsight = await kol.request("/api/insights/influencer");
+  const vis = infInsight.json?.visibility;
+  check(
+    "GET /api/insights/influencer",
+    infInsight.status === 200 &&
+      typeof infInsight.json?.score === "number" &&
+      typeof vis?.rank === "number" &&
+      typeof vis?.competitors === "number" &&
+      Array.isArray(infInsight.json?.subScores) &&
+      Array.isArray(infInsight.json?.missing),
+    `skor=${infInsight.json?.score} visibilitas=${vis?.score} peringkat=${vis?.rank}/${vis?.competitors} lamaran=${infInsight.json?.funnel?.total}`,
+  );
+
+  const umkmInsight = await umkm.request("/api/insights/umkm");
+  check(
+    "GET /api/insights/umkm",
+    umkmInsight.status === 200 &&
+      Array.isArray(umkmInsight.json?.events) &&
+      Array.isArray(umkmInsight.json?.actions) &&
+      typeof umkmInsight.json?.campaigns?.active === "number",
+    `campaign=${umkmInsight.json?.campaigns?.active} agenda=${umkmInsight.json?.events?.length} tindakan=${umkmInsight.json?.actions?.length}`,
+  );
+
+  const agendaBulanIni = (umkmInsight.json?.events ?? []).every(
+    (e) => typeof e.date === "string" && !Number.isNaN(Date.parse(e.date)) && typeof e.title === "string" && e.title.length > 0,
+  );
+  check("setiap agenda punya tanggal & judul asli", agendaBulanIni, `jumlah=${umkmInsight.json?.events?.length ?? 0}`);
+
+  const optimize = await kol.request("/api/ai/optimize-profile", { method: "POST" });
+  check(
+    "POST /api/ai/optimize-profile",
+    [200, 429].includes(optimize.status) &&
+      (optimize.status !== 200 ||
+        (typeof optimize.json?.overall === "number" &&
+          typeof optimize.json?.bio === "string" &&
+          optimize.json.bio.length >= 20 &&
+          Array.isArray(optimize.json?.recommendations))),
+    optimize.status === 429
+      ? "kuota AI habis (pengujian berulang)"
+      : `skor=${optimize.json?.overall} sumber=${optimize.json?.bioSource} aiUsed=${optimize.json?.aiUsed} saran=${optimize.json?.recommendations?.length}`,
+  );
+
+  const rateCard = await kol.request("/api/ai/rate-card", { method: "POST" });
+  const rateRows = rateCard.json?.platforms ?? [];
+  check(
+    "POST /api/ai/rate-card",
+    [200, 429].includes(rateCard.status) &&
+      (rateCard.status !== 200 ||
+        (rateRows.length >= 4 &&
+          rateRows.every((p) => Number.isFinite(p.min) && Number.isFinite(p.max) && p.max >= p.min) &&
+          typeof rateCard.json?.base === "number")),
+    rateCard.status === 429
+      ? "kuota AI habis (pengujian berulang)"
+      : `dasar=${rateCard.json?.base} rentang=${rateCard.json?.suggestedMin}-${rateCard.json?.suggestedMax} aiUsed=${rateCard.json?.aiUsed} sampelPasar=${rateCard.json?.market?.sampleSize}`,
+  );
+
+  const noNegatif = rateRows.every((p) => p.min > 0);
+  check("tarif hasil rate-card selalu positif", rateCard.status !== 200 || noNegatif, `baris=${rateRows.length}`);
+
   const quotaTest = await Promise.all(
     Array.from({ length: 12 }, () => kol.request("/api/ai/content", { method: "POST", body: { prompt: "uji batas cepat berulang", format: "hook", platform: "TikTok" } })),
   );
   check("pembatas kuota AI bekerja", quotaTest.some((r) => r.status === 429 || r.status === 503), `status=${[...new Set(quotaTest.map((r) => r.status))].join(",")}`);
+
+  // Penjaga akses: tanpa login 401, beda peran 403
+  const anon = new Client();
+  for (const [label, method] of [
+    ["/api/insights/influencer", "GET"],
+    ["/api/insights/umkm", "GET"],
+    ["/api/ai/optimize-profile", "POST"],
+    ["/api/ai/rate-card", "POST"],
+  ]) {
+    const res = await anon.request(label, { method });
+    check(`tanpa login ditolak: ${label}`, res.status === 401, `status=${res.status}`);
+  }
+  const crossA = await kol.request("/api/insights/umkm");
+  const crossB = await umkm.request("/api/insights/influencer");
+  check("kreator tidak bisa baca insight UMKM", crossA.status === 403, `status=${crossA.status}`);
+  check("UMKM tidak bisa baca insight kreator", crossB.status === 403, `status=${crossB.status}`);
+
+  // Sumber data halaman Highlights: pencocokan kreator + filter budget nyata
+  const creators = await umkm.request("/api/matching/influencers");
+  check(
+    "GET /api/matching/influencers",
+    creators.status === 200 && Array.isArray(creators.json) && creators.json.length > 0,
+    `kreator=${creators.json?.length}`,
+  );
+  const budgetRendah = await umkm.request("/api/matching/influencers?budget=300000");
+  const budgetTinggi = await umkm.request("/api/matching/influencers?budget=20000000");
+  const byId = new Map((budgetRendah.json ?? []).map((c) => [c.userId, c.score]));
+  const budgetMempengaruhi = (budgetTinggi.json ?? []).every((c) => (byId.get(c.userId) ?? 0) <= c.score);
+  check(
+    "filter budget menaikkan skor kreator yang tarifnya masuk",
+    budgetRendah.status === 200 && budgetTinggi.status === 200 && budgetMempengaruhi,
+    `rendah=${budgetRendah.json?.length} tinggi=${budgetTinggi.json?.length}`,
+  );
+
+  const kategori = await umkm.request("/api/matching/influencers?category=Kecantikan");
+  const related = (kategori.json ?? []).filter(
+    (c) =>
+      String(c.category).toLowerCase().includes("kecantikan") ||
+      (c.niches ?? []).some((n) => String(n).toLowerCase().includes("kecantikan")),
+  );
+  const others = (kategori.json ?? []).filter(
+    (c) =>
+      !String(c.category).toLowerCase().includes("kecantikan") &&
+      !(c.niches ?? []).some((n) => String(n).toLowerCase().includes("kecantikan")),
+  );
+  check(
+    "filter kategori menaikkan skor kreator sekategori",
+    kategori.status === 200 &&
+      related.length > 0 &&
+      others.every((o) => related[0].score >= o.score),
+    `sekategori=${related.length} lainnya=${others.length} skorTertinggi=${related[0]?.score}`,
+  );
+  const sortedDesc = (creators.json ?? []).every((c, i, arr) => i === 0 || arr[i - 1].score >= c.score);
+  check("peringkat kreator urut dari skor tertinggi", sortedDesc, `jumlah=${creators.json?.length}`);
+
+  // Undang kreator (tombol "Kirim tawaran kolaborasi" di halaman Highlights)
+  const inviteTarget = (creators.json ?? []).find((c) => c.userId !== kol.user.id) ?? (creators.json ?? [])[0];
+  const ownActive = (mine.json ?? []).find((c) => c.status === "ACTIVE") ?? null;
+  if (inviteTarget) {
+    const invite = await umkm.request("/api/collaborations", {
+      method: "POST",
+      body: {
+        participantId: inviteTarget.userId,
+        title: "Uji undangan dari halaman Highlights",
+        brief: "Uji otomatis: mengajak kreator berkolaborasi dari daftar unggulan.",
+        budget: ownActive?.budgetMin ?? 500000,
+        campaignId: ownActive?.id ?? null,
+      },
+    });
+    const inviteId = invite.json?.id;
+    check("UMKM mengundang kreator dari Highlights", [200, 201].includes(invite.status) && Boolean(inviteId), `status=${invite.status} ${invite.json?.error ?? ""}`);
+    if (inviteId) {
+      const listAfter = await umkm.request("/api/collaborations");
+      const found = (listAfter.json ?? []).find((c) => c.id === inviteId);
+      check("undangan muncul di daftar kolaborasi UMKM", Boolean(found), `status=${found?.status ?? "tidak ada"}`);
+      const cancelled = await umkm.request(`/api/collaborations/${inviteId}/action`, { method: "POST", body: { action: "cancel" } });
+      check("undangan uji bisa dibatalkan", cancelled.status === 200, `status=${cancelled.status} ${cancelled.json?.error ?? ""}`);
+    }
+  } else {
+    check("UMKM mengundang kreator dari Highlights", false, "tidak ada kreator untuk diundang");
+  }
+
+  // Panel "Perlu ditangani" di kalender: campaign aktif tanpa pelamar harus memunculkan tindakan
+  const tanpaPelamar = await umkm.request("/api/campaigns", {
+    method: "POST",
+    body: {
+      title: `SMOKE TANPA PELAMAR ${new Date().toISOString().slice(11, 19)}`,
+      description: "Campaign uji untuk memeriksa tindakan otomatis pada kalender UMKM.",
+      category: "Kuliner",
+      budgetMin: 100000,
+      budgetMax: 150000,
+      deliverables: "1 video Reels",
+      requirements: "Kreator dengan tarif sangat rendah",
+    },
+  });
+  check("membuat campaign tanpa pelamar", tanpaPelamar.status === 201 && Boolean(tanpaPelamar.json?.id), `status=${tanpaPelamar.status}`);
+
+  const insightSetelah = await umkm.request("/api/insights/umkm");
+  const tindakan = (insightSetelah.json?.actions ?? []).find(
+    (a) => String(a.href).includes(tanpaPelamar.json?.id ?? "__kosong__"),
+  );
+  check(
+    "campaign tanpa pelamar memunculkan tindakan",
+    Boolean(tindakan) && String(tindakan?.reason ?? "").length > 10,
+    tindakan ? `judul="${tindakan.title}"` : `tindakan=${(insightSetelah.json?.actions ?? []).length}`,
+  );
+
+  if (tanpaPelamar.json?.id) {
+    const tutup = await umkm.request(`/api/campaigns/${tanpaPelamar.json.id}`, {
+      method: "PATCH",
+      body: { status: "CLOSED" },
+    });
+    check("campaign uji ditutup lagi", tutup.status === 200 && tutup.json?.status === "CLOSED", `status=${tutup.status}`);
+  }
+
+  const agendaSetelahTutup = await umkm.request("/api/insights/umkm");
+  check(
+    "menutup campaign menghapusnya dari daftar tindakan",
+    agendaSetelahTutup.status === 200 &&
+      !(agendaSetelahTutup.json?.actions ?? []).some((a) => String(a.href).includes(tanpaPelamar.json?.id ?? "__kosong__")),
+    `tindakan=${(agendaSetelahTutup.json?.actions ?? []).length}`,
+  );
 
   // ---- halaman harus memuat DAN berisi konten yang benar ----
   const pages = [
@@ -252,6 +436,9 @@ async function main() {
         { path: `/dashboard/umkm/campaigns/${created.json.id}`, must: "Memuat campaign" },
         { path: "/dashboard/umkm/review-campaign" },
         { path: "/dashboard/umkm/skill-assistant", must: "AI Skill Assistant" },
+        { path: "/dashboard/umkm/highlights", must: "Memuat peringkat kreator" },
+        { path: "/dashboard/umkm/smart-calendar", must: "Memuat agenda kampanye" },
+        { path: "/dashboard/umkm/smart-matching", must: "Smart Matching" },
         { path: "/dashboard/umkm/chat" },
         { path: "/dashboard/umkm/history" },
         { path: "/dashboard/umkm/analytics" },
@@ -269,6 +456,10 @@ async function main() {
         { path: "/dashboard/influencer/chat" },
         { path: "/dashboard/influencer/history" },
         { path: "/dashboard/influencer/portfolio" },
+        { path: "/dashboard/influencer/profile-optimizer", must: "Menganalisis profil" },
+        { path: "/dashboard/influencer/rate-recommendation", must: "Menghitung tarif" },
+        { path: "/dashboard/influencer/priority-matching", must: "Memuat data visibilitas" },
+        { path: "/dashboard/influencer/umkm-insight", must: "Memuat UMKM yang membuka campaign" },
         { path: "/dashboard/influencer/profile" },
         { path: "/dashboard/influencer/analytics" },
       ],

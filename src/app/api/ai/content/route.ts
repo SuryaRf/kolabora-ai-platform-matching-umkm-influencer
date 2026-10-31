@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { aiChat, aiInfo, clampText } from "@/lib/ai";
 import { guardAiQuota } from "@/lib/rate-limit";
 import { SYSTEM_CONTENT } from "@/lib/prompts";
-import { aiErrorResponse, requireAiSession, readString, isResponse } from "@/lib/ai-route";
+import { aiErrorResponse, requireSession, readString, isResponse } from "@/lib/ai-route";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -37,7 +37,7 @@ function platformHint(raw: string): string {
  * Body: { prompt, format?, platform?, tone?, campaignId?, previous?, feedback? }
  */
 export async function POST(req: Request) {
-  const guard = await requireAiSession();
+  const guard = await requireSession();
   if (!guard.ok) return guard.res;
 
   const quota = guardAiQuota(guard.userId);

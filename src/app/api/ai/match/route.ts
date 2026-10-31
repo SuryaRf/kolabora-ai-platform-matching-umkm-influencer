@@ -4,7 +4,7 @@ import { aiInfo, aiJson, clampText } from "@/lib/ai";
 import { guardAiQuota } from "@/lib/rate-limit";
 import { SYSTEM_MATCH } from "@/lib/prompts";
 import { blendScores, scoreCampaign, type ScoringCampaign } from "@/lib/matching";
-import { aiErrorResponse, requireAiSession } from "@/lib/ai-route";
+import { aiErrorResponse, requireSession } from "@/lib/ai-route";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -30,7 +30,7 @@ interface AiMatchPayload {
  * dan usulan kalimat lamaran. Bila AI gagal, hasil aturan tetap dikembalikan.
  */
 export async function POST(req: Request) {
-  const guard = await requireAiSession(["INFLUENCER"]);
+  const guard = await requireSession(["INFLUENCER"]);
   if (!guard.ok) return guard.res;
 
   const quota = guardAiQuota(guard.userId);

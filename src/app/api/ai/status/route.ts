@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { aiInfo, aiIsConfigured } from "@/lib/ai";
 import { aiLimits } from "@/lib/rate-limit";
-import { requireAiSession } from "@/lib/ai-route";
+import { requireSession } from "@/lib/ai-route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * untuk memastikan kunci benar (berguna saat deploy ke VPS).
  */
 export async function GET(req: Request) {
-  const guard = await requireAiSession();
+  const guard = await requireSession();
   if (!guard.ok) return guard.res;
 
   const info = aiInfo();

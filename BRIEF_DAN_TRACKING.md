@@ -2,7 +2,7 @@
 
 **Tanggal Dibuat:** 23 Oktober 2026  
 **Terakhir Diupdate:** 31 Oktober 2026  
-**Status:** Siap deploy — uji end-to-end 51/51 lulus di lokal  
+**Status:** Siap deploy — uji end-to-end 81/81 lulus di lokal  
 **Tujuan:** Mengubah prototype saat ini menjadi aplikasi yang benar-benar siap digunakan secara real (bukan hanya MVP)
 
 ---
@@ -45,7 +45,7 @@
 - **Email/Notification System** - ⏳ belum (P1)
 - **Validation & Security** - ✅ Zod, cek sesi, rate limit AI, input dipangkas
 - **Error Handling** - ✅ fallback aturan + pesan terbaca di UI
-- **Testing** - ✅ `scripts/smoke-test.mjs` (51 pemeriksaan end-to-end) + `scripts/test-env-block.sh` (16 pemeriksaan naskah deploy)
+- **Testing** - ✅ `scripts/smoke-test.mjs` (81 pemeriksaan end-to-end) + `scripts/test-env-block.sh` (16 pemeriksaan naskah deploy)
 - **Environment Config** - ✅ `.env.example` (dev) dan `.env.production.example` (VPS)
 - **Deployment Ready** - ✅ naskah VPS + PM2 + Caddy, dan tetap bisa ke Vercel
 
@@ -134,12 +134,12 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Task | Status | Priority | Notes |
 |---|---|---|---|
 | Klien AI DeepSeek (tanpa dependency) | ✅ Done | P0 | `src/lib/ai.ts` — timeout 40 dtk, retry 429/5xx, mode JSON, perbaikan JSON rusak |
-| Endpoint AI | ✅ Done | P0 | `/api/ai/{status,content,brief,score-campaign,match}` + `/api/health` publik |
+| Endpoint AI | ✅ Done | P0 | `/api/ai/{status,content,brief,score-campaign,match,optimize-profile,rate-card}` + `/api/health` publik |
 | Pencocokan hibrida (aturan + AI) | ✅ Done | P0 | `blendScores()`; hasil aturan tetap tampil saat AI mati/gagal |
 | Penilai kelayakan brief | ✅ Done | P0 | `src/lib/campaign-score.ts`, skor instan di form buat campaign |
 | UI terhubung ke AI sungguhan | ✅ Done | P0 | buat campaign, content assistant, skill assistant, smart matching |
 | Kuota AI per pengguna | ✅ Done | P0 | `src/lib/rate-limit.ts` (per menit/jam/hari) |
-| Uji end-to-end seluruh alur | ✅ Done | P0 | `scripts/smoke-test.mjs` — **51/51 lulus** (login→campaign→lamar→escrow→review→selesai) |
+| Uji end-to-end seluruh alur | ✅ Done | P0 | `scripts/smoke-test.mjs` — **81/81 lulus** (login→campaign→lamar→escrow→review→selesai) |
 | Uji naskah deploy | ✅ Done | P0 | `scripts/test-env-block.sh` — 16/16 lulus (`npm run test:deploy`) |
 | Skema & data demo sebagai SQL | ✅ Done | P0 | `supabase/migrations/0001_init.sql`, `0002_seed_demo.sql` (idempoten, sudah diverifikasi ulang) |
 | Naskah pasang/perbarui VPS | ✅ Done | P0 | `scripts/deploy-vps.sh` — Node 22, Postgres, PM2, Caddy, firewall, uji `.env` aman |
@@ -151,6 +151,27 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Rating & review timbal balik (lihat Phase 3) | ⏳ To Do | P1 | setelah kolaborasi COMPLETED |
 | Notifikasi email | ⏳ To Do | P1 | butuh layanan SMTP |
 | Payment gateway sungguhan (Midtrans/Xendit) | ⏳ To Do | P2 | sengaja masih simulasi |
+
+### Phase 6: Menghapus Data Pura-pura dari UI (selesai 31 Okt)
+| Task | Status | Priority | Notes |
+|---|---|---|---|
+| Mesin skor profil & tarif aturan | ✅ Done | P0 | `src/lib/profile-score.ts` — 6 sub-skor berbobot + `rateCard()` (satu acuan dengan `RATE_PER_FOLLOWER_PER_DELIVERABLE` di sisi UMKM) |
+| Pengambil data profil/pasar | ✅ Done | P0 | `src/lib/facts.ts` — `loadInfluencerFacts`, `loadMarketSample`, `loadInfluencerStats` (server only) |
+| Insight kreator | ✅ Done | P0 | `GET /api/insights/influencer` — skor, visibilitas, peringkat, funnel, escrow cair |
+| Insight UMKM | ✅ Done | P0 | `GET /api/insights/umkm` — ringkasan + agenda dari tanggal asli + daftar "perlu ditangani" |
+| AI Optimasi Profil | ✅ Done | P0 | `POST /api/ai/optimize-profile` + halaman `influencer/profile-optimizer` (skor nyata, draf bio bisa diterapkan ke profil) |
+| AI Kartu Tarif | ✅ Done | P0 | `POST /api/ai/rate-card` + halaman `influencer/rate-recommendation` (bisa dipasang jadi tarif profil) |
+| Priority Matching tanpa angka fiktif | ✅ Done | P0 | memakai peringkat visibilitas hasil perhitungan; tombol "Optimalkan profil" berfungsi |
+| UMKM Insight (kreator→UMKM) | ✅ Done | P0 | daftar campaign nyata, filter lokasi dari data, lamaran lewat `POST /api/campaigns/apply` |
+| Kreator Unggulan (UMKM) | ✅ Done | P0 | peringkat dari `GET /api/matching/influencers`, chip kategori/budget nyata, modal detail + **undang kreator** (`POST /api/collaborations`) |
+| Kalender Kolaborasi | ✅ Done | P0 | navigasi bulan nyata, agenda dari `startDate/endDate` + tahap kolaborasi, tanpa klaim "prime time" |
+| Tautan deep-link chat/riwayat | ✅ Done | P1 | `?collaboration=<id>` membuka percakapan/riwayat terkait |
+| Membersihkan data contoh di komponen | ✅ Done | P0 | tidak ada lagi `const mock...` di 6 halaman showcase |
+| Lint bersih | ✅ Done | P0 | `npx eslint src` → 0 error (perbaiki `react-hooks/set-state-in-effect` dengan derived state / mount ulang) |
+| Perluas uji end-to-end | ✅ Done | P0 | `scripts/smoke-test.mjs` 51 → **81** pemeriksaan (endpoint insight, guard 401/403, filter pencocokan, undangan Highlights, tindakan kalender) |
+| Rating & review timbal balik | ⏳ To Do | P1 | fiturnya belum dibuat (bukan angka fiktif): penilaian dua arah setelah COMPLETED |
+| Halaman analytics kreator & UMKM | ✅ Done | P0 | angka dihitung dari Prisma/API, bukan statistik contoh |
+| Tidak ada angka fiktif di UI dashboard | ✅ Diperiksa | P0 | penelusuran pola `mock`, `trend:`, `prime time`, peringkat berbayar → tidak ada yang tersisa |
 
 
 ---
@@ -185,22 +206,30 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 ### Sudah Dikerjakan (31 Oktober)
 **Fondasi & alur inti**
 - ✅ Skema Prisma 14 tabel + salinan SQL (`supabase/migrations/0001_init.sql`, `0002_seed_demo.sql`)
-- ✅ NextAuth v5 (Credentials + JWT) dengan peran UMKM/INFLUENCER/BRAND
+- ✅ NextAuth v5 (Credentials + JWT) dengan peran UMKM dan INFLUENCER
 - ✅ API lengkap: auth, campaigns, applications, collaborations (mesin status), messages, reviews, notifications, profile, portfolio, matching, payments
 - ✅ Proteksi per peran di layout + pengecekan sesi di setiap API
 - ✅ Alur penuh teruji: buat campaign -> lamar -> terima -> chat -> deal -> escrow -> produksi -> kirim konten -> review -> cairkan -> COMPLETED
 
 **AI sungguhan (DeepSeek)**
 - ✅ Klien AI tanpa dependency eksternal: timeout, retry, mode JSON, perbaikan JSON rusak (`src/lib/ai.ts`)
-- ✅ Endpoint `POST /api/ai/{match,content,brief,score-campaign}` + `GET /api/ai/status?test=1`
+- ✅ Endpoint `POST /api/ai/{match,content,brief,score-campaign,optimize-profile,rate-card}` + `GET /api/ai/status?test=1`
 - ✅ Pencocokan hibrida (aturan + AI) dan penilai kelayakan brief (40% aturan / 60% AI)
 - ✅ Halaman buat campaign: skor kesiapan langsung, "Periksa dengan AI", "Susun draft brief dengan AI"
 - ✅ Content assistant (influencer) & skill assistant (UMKM) memakai AI asli
 - ✅ Kuota AI per akun per menit/jam/hari; prompt hanya memuat data milik pengguna yang login
 - ✅ Fallback aturan tetap tampil ketika AI mati, gagal, atau kunci belum diisi
 
+**Data asli menggantikan mockup (Phase 6)**
+- ✅ `src/lib/profile-score.ts`: skor profil 6 komponen berbobot + kalkulator tarif per jenis konten (satu acuan dengan penilai brief UMKM, `RATE_PER_FOLLOWER_PER_DELIVERABLE`)
+- ✅ `src/lib/facts.ts`: pengambil data profil, sampel pasar (median budget campaign sekategori), dan funnel lamaran
+- ✅ Endpoint baru: `GET /api/insights/influencer`, `GET /api/insights/umkm`, `POST /api/ai/optimize-profile`, `POST /api/ai/rate-card`
+- ✅ 6 halaman showcase dibalik dari angka pura-pura ke data nyata: optimizer profil, rekomendasi tarif, priority matching, UMKM insight (kreator), kreator unggulan (UMKM), kalender kolaborasi
+- ✅ Tombol yang dulu mati sekarang berfungsi: terapkan bio ke profil, pasang tarif ke profil, lamar campaign dari halaman insight, undang kreator dari halaman unggulan, buka chat/riwayat lewat `?collaboration=<id>`
+- ✅ Tidak ada lagi klaim fiktif ("prime time", "+12% trend", peringkat berbayar); yang tersisa hanya angka hasil perhitungan yang sumbernya ditulis di UI
+
 **Kualitas & operasional**
-- ✅ `scripts/smoke-test.mjs`: 51 pemeriksaan end-to-end (halaman, API, AI, eskalasi status) -> **51/51 lulus**
+- ✅ `scripts/smoke-test.mjs`: 81 pemeriksaan end-to-end (halaman, API, AI, eskalasi status, penjaga peran, filter pencocokan, undangan kolaborasi, agenda kalender) -> **81/81 lulus**
 - ✅ `scripts/test-env-block.sh`: 16 pemeriksaan penulisan `.env` oleh naskah VPS -> **16/16 lulus**
 - ✅ `npx tsc --noEmit` bersih dan `npm run build` berhasil (semua route ikut ter-generate)
 - ✅ `/api/health` melaporkan versi, kondisi database, dan status konfigurasi AI

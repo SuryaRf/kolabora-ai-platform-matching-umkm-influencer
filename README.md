@@ -105,6 +105,14 @@ Status lengkap: `PROPOSED → NEGOTIATION → AGREED → ESCROW_HELD → IN_PROD
 CONTENT_SUBMITTED → UNDER_REVIEW → REVISION_REQUESTED → APPROVED → COMPLETED`
 (plus `CANCELLED`, `DISPUTED`).
 
+Halaman pendukung juga memakai data asli, bukan angka contoh: *Kreator Unggulan*
+menampilkan peringkat kreator dari mesin pencocok dan bisa mengirim tawaran
+kolaborasi langsung; *Kalender Kolaborasi* menyusun agenda dari tanggal campaign
+dan tahap kolaborasi; di sisi kreator ada *Optimizer Profil*, *Rekomendasi Tarif*,
+*Priority Matching* (visibilitas), dan *UMKM Insight* yang bisa dipakai melamar.
+Tautan bertanda `?collaboration=<id>` membuka ruang chat / item riwayat yang
+bersangkutan.
+
 ---
 
 ## 4. Fitur AI (DeepSeek)
@@ -115,14 +123,26 @@ CONTENT_SUBMITTED → UNDER_REVIEW → REVISION_REQUESTED → APPROVED → COMPL
 | Generator konten (caption/hook/skrip) | `/dashboard/influencer/ai-content-assistant` | `POST /api/ai/content` | pesan jelas: AI belum aktif |
 | Asisten brief & strategi UMKM | `/dashboard/umkm/skill-assistant` | `POST /api/ai/brief` | tombol tetap ada, hasil tidak dibuat |
 | Penilai kelayakan brief | `/dashboard/umkm/campaigns/new` | `POST /api/ai/score-campaign` | skor aturan (instan, 0 biaya) |
+| Optimasi profil & draf bio | `/dashboard/influencer/profile-optimizer` | `POST /api/ai/optimize-profile` | skor 6 komponen + draf bio dari data profil (`src/lib/profile-score.ts`) |
+| Kartu tarif per jenis konten | `/dashboard/influencer/rate-recommendation` | `POST /api/ai/rate-card` | tarif aturan; AI hanya menggeser maks. 25% |
 | Status & uji koneksi AI | — | `GET /api/ai/status?test=1` | `configured: false` |
+
+Semua halaman itu memakai angka yang benar-benar ada di database — tidak ada data
+contoh yang ditulis di dalam komponen. Endpoint pendukung (bukan AI, tetap butuh login):
+
+| Endpoint | Dipakai oleh | Isi |
+|---|---|---|
+| `GET /api/insights/influencer` | `/dashboard/influencer/priority-matching` | skor profil, visibilitas & peringkat antar kreator, funnel lamaran, total escrow yang cair |
+| `GET /api/insights/umkm` | `/dashboard/umkm/smart-calendar` | ringkasan campaign/pelamar/escrow, agenda dari tanggal asli (`startDate`, `escrowHeldAt`, dst.), daftar "perlu ditangani" |
+| `GET /api/matching/influencers` | `/dashboard/umkm/highlights` | peringkat kreator + alasan pencocokan; filter `category`, `location`, `budget` |
+| `GET /api/health` | pemantau publik | versi, kondisi database, konfigurasi AI |
 
 Cara kerjanya:
 
-- **Hibrida.** Perhitungan aturan (`src/lib/matching.ts`, `src/lib/campaign-score.ts`)
-  selalu jalan; AI menambahkan alasan, skor kualitatif, draf lamaran, dan risiko.
-  Skor akhir = 40% aturan + 60% AI (penilaian brief) atau dicampur lewat
-  `blendScores()` (pencocokan).
+- **Hibrida.** Perhitungan aturan (`src/lib/matching.ts`, `src/lib/campaign-score.ts`,
+  `src/lib/profile-score.ts`) selalu jalan; AI menambahkan alasan, skor kualitatif,
+  draf lamaran, draf bio, dan risiko. Skor akhir = 40% aturan + 60% AI (penilaian
+  brief) atau dicampur lewat `blendScores()` (pencocokan).
 - **Tahan banting.** Timeout keras, retry otomatis untuk 429/5xx, dan JSON yang
   rusak dipulihkan sebelum parsing. Bila AI gagal, halaman tetap menampilkan hasil
   aturan beserta alasannya (`aiUsed: false`, `aiError`).
@@ -187,8 +207,12 @@ src/lib/rate-limit.ts                # kuota AI per pengguna
 src/lib/ai-route.ts                  # penjaga sesi/peran + pemetaan error AI
 src/lib/matching.ts                  # skor pencocokan aturan
 src/lib/campaign-score.ts            # skor kelayakan brief aturan + penggabungan AI
+src/lib/profile-score.ts             # skor profil 6 komponen + kalkulator tarif aturan
+src/lib/facts.ts                     # pengambil data profil/pasar (server only)
 src/lib/collab.ts                    # status, langkah, aksi (client-safe)
-src/app/api/ai/...                   # endpoint AI
+src/app/api/ai/...                   # endpoint AI (match, content, brief, score-campaign,
+                                     #   optimize-profile, rate-card, status)
+src/app/api/insights/...             # data halaman: influencer & umkm
 src/app/api/health/route.ts          # probe database + AI + versi
 src/app/api/collaborations/[id]/action/route.ts  # mesin status kolaborasi
 scripts/deploy-vps.sh                # pasang/perbarui VPS
@@ -218,13 +242,19 @@ npm run backup:db       # cadangkan basis data
 ```
 
 `npm run smoke` memakai `BASE_URL` (default `http://localhost:3000`) dan akun
-`SMOKE_UMKM` / `SMOKE_KOL` / `SMOKE_PASS`. Setelah deploy:
+`SMOKE_UMKM` / `SMOKE_KOL` / `SMOKE_PASS`. Naskahnya membuat campaign sendiri,
+lalu menutup/membatalkan objek uji, jadi aman dijalankan berulang. Setelah deploy:
 
 ```bash
 BASE_URL=https://kolabora.tech npm run smoke
 ```
 
-Status saat ini: **51/51 pemeriksaan lulus** di dev lokal (AI dalam mode aturan
+Yang diperiksa (81 butir): logika alur penuh (lamar → terima → escrow → review →
+selesai), seluruh API (termasuk penjaga 401/403 per peran), endpoint AI beserta
+fallback dan pembatas kuota, perhitungan tarif & skor profil, undangan kolaborasi
+dari halaman Highlights, agenda kalender, dan 32 halaman yang harus ter-render.
+
+Status saat ini: **81/81 pemeriksaan lulus** di dev lokal (AI dalam mode aturan
 karena kunci belum diisi).
 
 ---

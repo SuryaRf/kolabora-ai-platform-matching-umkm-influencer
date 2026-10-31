@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { aiJson, aiInfo, clampText } from "@/lib/ai";
 import { guardAiQuota } from "@/lib/rate-limit";
 import { SYSTEM_SCORE } from "@/lib/prompts";
-import { aiErrorResponse, requireAiSession } from "@/lib/ai-route";
+import { aiErrorResponse, requireSession } from "@/lib/ai-route";
 import { mergeRuleAndAi, scoreCampaignDraft, type AiScoreResult, type CampaignDraft } from "@/lib/campaign-score";
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ function num(value: unknown, fallback = 0): number {
  * Selalu mengembalikan skor aturan; skor AI ditambahkan bila tersedia.
  */
 export async function POST(req: Request) {
-  const guard = await requireAiSession(["UMKM"]);
+  const guard = await requireSession(["UMKM"]);
   if (!guard.ok) return guard.res;
 
   const quota = guardAiQuota(guard.userId);

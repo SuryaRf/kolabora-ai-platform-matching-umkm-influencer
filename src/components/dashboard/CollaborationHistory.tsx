@@ -83,7 +83,13 @@ export default function CollaborationHistory({ role }: { role: Role }) {
       if (!res.ok) return;
       const data: CollabDTO[] = await res.json();
       setItems(data);
-      setExpanded((prev) => prev ?? data[0]?.id ?? null);
+      // Tautan dalam /dashboard/{role}/history?collaboration=<id> langsung membuka item itu.
+      const focus =
+        typeof window === "undefined"
+          ? null
+          : new URLSearchParams(window.location.search).get("collaboration");
+      const target = focus ? data.find((c) => c.id === focus) : null;
+      setExpanded((prev) => prev ?? target?.id ?? data[0]?.id ?? null);
     } catch {
       setError("Gagal memuat data kolaborasi");
     } finally {

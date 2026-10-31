@@ -1,6 +1,7 @@
 /**
- * Penjaga bersama untuk semua endpoint AI: sesi, peran, dan pemetaan error
- * agar balasan ke UI selalu konsisten (Bahasa Indonesia + kode yang bisa dicek).
+ * Penjaga bersama untuk endpoint yang butuh identitas (AI maupun insight):
+ * sesi, peran, dan pemetaan error agar balasan ke UI selalu konsisten
+ * (Bahasa Indonesia + kode yang bisa dicek).
  */
 
 import { NextResponse } from "next/server";
@@ -14,7 +15,7 @@ type Guard =
   | { ok: true; session: Session; userId: string; role: UserRole }
   | { ok: false; res: NextResponse };
 
-export async function requireAiSession(roles?: UserRole[]): Promise<Guard> {
+export async function requireSession(roles?: UserRole[]): Promise<Guard> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, res: NextResponse.json({ error: "Silakan masuk terlebih dahulu." }, { status: 401 }) };

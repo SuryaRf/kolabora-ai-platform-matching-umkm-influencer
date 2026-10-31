@@ -274,8 +274,11 @@ Dua naskah pengujian lain memeriksa perkakas deploy, bukan aplikasinya:
 `npm run test:keys` (27 butir — cara `scripts/set-key.sh` mengisi kunci tanpa
 membocorkannya). Keduanya hanya memakai direktori sementara dan kunci palsu.
 
-Status saat ini: **81/81** lulus di dev lokal (AI dalam mode aturan karena kunci
-belum diisi), ditambah **16/16** dan **27/27** untuk naskah deploy.
+Status saat ini: **81/81** lulus di dev lokal **dengan AI DeepSeek asli aktif**
+(`aiUsed: true` pada pencocokan, penilai brief, optimizer profil, dan kartu tarif;
+`/api/ai/status?test=1` → `test.ok: true`, latensi ±0,8 detik), ditambah **16/16**
+dan **27/27** untuk naskah deploy. Jalur tanpa kunci (mode perhitungan aturan)
+tetap diuji dan ikut lulus.
 
 ---
 

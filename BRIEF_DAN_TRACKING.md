@@ -2,7 +2,7 @@
 
 **Tanggal Dibuat:** 23 Oktober 2026  
 **Terakhir Diupdate:** 31 Oktober 2026  
-**Status:** Siap deploy — uji end-to-end 81/81 lulus di lokal  
+**Status:** Siap deploy — uji end-to-end 81/81 lulus di lokal dengan AI DeepSeek asli aktif  
 **Tujuan:** Mengubah prototype saat ini menjadi aplikasi yang benar-benar siap digunakan secara real (bukan hanya MVP)
 
 ---
@@ -146,7 +146,8 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Konfigurasi PM2 + Caddy | ✅ Done | P0 | `ecosystem.config.js`, `deploy/Caddyfile` (HTTPS, header, body 10 MB) |
 | Pencadangan basis data | ✅ Done | P0 | `scripts/backup-db.sh` — pemulihan `.dump` dan `.sql` sudah diverifikasi sungguhan |
 | Panduan deploy berbahasa Indonesia | ✅ Done | P0 | `docs/DEPLOY-VPS.md` (DNS, AI, update, rollback, backup, alternatif Vercel) |
-| Menempelkan `DEEPSEEK_API_KEY` | ⏳ Menunggu pengguna | P0 | `npm run set-key` (input tersembunyi, izin 0600) lalu `pm2 reload --update-env` / restart dev; cek: `npm run set-key -- --check` |
+| Menempelkan `DEEPSEEK_API_KEY` | ✅ Done | P0 | `npm run set-key` (input tersembunyi, izin 0600) — kunci asli terisi 35 karakter, tidak pernah tampil di log/chat |
+| Verifikasi AI asli end-to-end | ✅ Done | P0 | `/api/ai/status?test=1` → `ok:true` (770 ms); `smoke` 81/81 dengan `aiUsed=true` di match/score-campaign/optimize-profile/rate-card; skor brief hibrida stabil (aturan 78 → hibrida 74; brief ringkas aturan 52 → hibrida 46) |
 | Menjalankan deploy di VPS `kolabora.tech` | ⏳ To Do | P0 | butuh IP/akses SSH — `bash scripts/deploy-vps.sh --domain kolabora.tech --seed --test` |
 | Rating & review timbal balik (lihat Phase 3) | ⏳ To Do | P1 | setelah kolaborasi COMPLETED |
 | Notifikasi email | ⏳ To Do | P1 | butuh layanan SMTP |

@@ -53,7 +53,11 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    void load();
+    // Fungsi async lokal: setState tidak terjadi sinkron di dalam effect.
+    const muat = async () => {
+      await load();
+    };
+    void muat();
     const id = setInterval(() => void load(), 20000);
     return () => clearInterval(id);
   }, [load]);

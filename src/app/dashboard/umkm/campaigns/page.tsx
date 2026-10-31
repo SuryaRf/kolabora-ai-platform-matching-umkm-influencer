@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Megaphone,
   Plus,
@@ -15,7 +16,6 @@ import {
   XCircle,
 } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
-import Modal from "@/components/ui/Modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface Campaign {
@@ -38,24 +38,10 @@ const STATUS_STYLE: Record<string, string> = {
   COMPLETED: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
 };
 
-const EMPTY_FORM = {
-  title: "",
-  description: "",
-  category: "",
-  budgetMin: "",
-  budgetMax: "",
-  location: "",
-  requirements: "",
-  deliverables: "",
-};
-
 export default function UMKMCampaignsPage() {
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -69,31 +55,6 @@ export default function UMKMCampaignsPage() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const res = await fetch("/api/campaigns", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Gagal membuat campaign");
-        return;
-      }
-      setOpen(false);
-      setForm(EMPTY_FORM);
-      await load();
-    } catch {
-      setError("Gagal membuat campaign");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const totalApplicants = campaigns.reduce(
     (acc, c) => acc + c._count.applications,
@@ -130,7 +91,7 @@ export default function UMKMCampaignsPage() {
           ))}
         </div>
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => router.push("/dashboard/umkm/campaigns/new")}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-umkm hover:bg-umkm-dark transition-all"
         >
           <Plus className="w-4 h-4" /> Buat Campaign
@@ -149,7 +110,7 @@ export default function UMKMCampaignsPage() {
             Buat campaign pertama Anda agar influencer dapat mulai melamar.
           </p>
           <button
-            onClick={() => setOpen(true)}
+            onClick={() => router.push("/dashboard/umkm/campaigns/new")}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-umkm hover:bg-umkm-dark"
           >
             <Plus className="w-4 h-4" /> Buat Campaign
@@ -210,145 +171,6 @@ export default function UMKMCampaignsPage() {
         </div>
       )}
 
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Buat Campaign Baru"
-        description="Campaign akan langsung tampil dan bisa dilamar influencer."
-        maxWidth="max-w-2xl"
-      >
-        <form onSubmit={submit} className="space-y-4">
-          {error && (
-            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 text-sm">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-xs font-medium mb-1.5">
-              Judul Campaign
-            </label>
-            <input
-              required
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="Contoh: Promosi Kopi Lokal Edisi Kemerdekaan"
-              className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium mb-1.5">
-                Kategori
-              </label>
-              <input
-                required
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                placeholder="Kuliner, Fashion, Gadget..."
-                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">
-                Lokasi Target
-              </label>
-              <input
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                placeholder="Jakarta / Remote"
-                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium mb-1.5">
-                Budget Minimum (Rp)
-              </label>
-              <input
-                required
-                type="number"
-                min={0}
-                value={form.budgetMin}
-                onChange={(e) => setForm({ ...form, budgetMin: e.target.value })}
-                placeholder="1000000"
-                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">
-                Budget Maksimum (Rp)
-              </label>
-              <input
-                required
-                type="number"
-                min={0}
-                value={form.budgetMax}
-                onChange={(e) => setForm({ ...form, budgetMax: e.target.value })}
-                placeholder="5000000"
-                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5">
-              Deskripsi & Brief
-            </label>
-            <textarea
-              required
-              rows={4}
-              value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
-              placeholder="Jelaskan produk, target audiens, pesan utama, dan ekspektasi konten."
-              className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium mb-1.5">
-                Persyaratan Influencer
-              </label>
-              <textarea
-                rows={3}
-                value={form.requirements}
-                onChange={(e) =>
-                  setForm({ ...form, requirements: e.target.value })
-                }
-                placeholder="Minimal 5k followers, niche kuliner..."
-                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">
-                Deliverables
-              </label>
-              <textarea
-                rows={3}
-                value={form.deliverables}
-                onChange={(e) =>
-                  setForm({ ...form, deliverables: e.target.value })
-                }
-                placeholder="1 video TikTok, 3 story Instagram..."
-                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-umkm/50"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-umkm hover:bg-umkm-dark disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Plus className="w-4 h-4" />
-            )}
-            Publikasikan Campaign
-          </button>
-        </form>
-      </Modal>
     </FeaturePage>
   );
 }

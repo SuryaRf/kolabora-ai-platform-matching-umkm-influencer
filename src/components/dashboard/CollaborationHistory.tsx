@@ -92,7 +92,11 @@ export default function CollaborationHistory({ role }: { role: Role }) {
   }, []);
 
   useEffect(() => {
-    void load();
+    // Fungsi async lokal: setState tidak terjadi sinkron di dalam effect.
+    const muat = async () => {
+      await load();
+    };
+    void muat();
   }, [load]);
 
   useEffect(() => {

@@ -1,7 +1,8 @@
 # BRIEF & TRACKING - Kolabora (Prototype → Production Ready
 
 **Tanggal Dibuat:** 23 Oktober 2026  
-**Status:** In Progress  
+**Terakhir Diupdate:** 31 Oktober 2026  
+**Status:** Siap deploy — uji end-to-end 51/51 lulus di lokal  
 **Tujuan:** Mengubah prototype saat ini menjadi aplikasi yang benar-benar siap digunakan secara real (bukan hanya MVP)
 
 ---
@@ -10,12 +11,15 @@
 
 **Nama Proyek:** Kolabora  
 **Deskripsi:** Platform multi-sided marketplace berbasis AI yang menghubungkan UMKM dengan influencer untuk kolaborasi pemasaran digital.  
-**Tech Stack Saat Ini:** Next.js 16.2.10 (App Router), React 19.2.4, TypeScript 5, Tailwind CSS 4, Lucide React  
-**Model:** Next.js 16 dengan App Router, client-side components, localStorage untuk data sementara
+**Tech Stack Saat Ini:** Next.js 16.2.10 (App Router), React 19.2.4, TypeScript 5, Tailwind CSS 4, Lucide React, NextAuth v5, Prisma + PostgreSQL, AI DeepSeek  
+**Model:** Next.js App Router, database sungguhan (Postgres), API routes server-side, komponen client yang mengambil data dari API
 
 ---
 
-## 2. Kondisi Saat Ini (Audit)
+## 2. Kondisi Saat Ini (Audit Awal — Oktober)
+
+> Daftar "yang masih kurang" di bawah adalah hasil audit sebelum pengerjaan.
+> Status tiap butir sudah diperbarui pada bagian 4 (Rencana Kerja).
 
 ### ✅ Yang Sudah Ada
 - **Landing Page** - Navbar, HeroSection, SharedFeatures, UMKMSection, InfluencerSection, PricingSection, Footer
@@ -29,21 +33,21 @@
 - **Auth Pages** - Login & Register UI (belum functional)
 - **Local State Management** - `lib/collaborations.ts` dengan useCollaborations hook
 
-### ⚠️ Yang Masih Kurang / Perlu Diperbaiki untuk Production
-- **Autentikasi & Authorization** - Login/Register hanya UI, tidak ada auth system (NextAuth, Clerk, dll)
-- **Database** - Semua data menggunakan localStorage, perlu database real (Postgres/MySQL + Prisma/Drizzle)
-- **Backend/API** - Tidak ada API routes, semua logic client-side
-- **User Management** - Tidak ada user profiles, roles, sessions
-- **File Upload** - Untuk portfolio, konten review, dll
-- **Payment/Escrow** - Hanya UI/info, perlu integrasi payment gateway (Midtrans/Xendit) & escrow logic
-- **Real AI Matching** - Saat ini hardcoded data, perlu AI/ML atau rule-based engine yang sebenarnya
-- **Notifications** - Hanya UI bell, tidak functional
-- **Email/Notification System** - Belum ada
-- **Validation & Security** - Belum ada (auth, CSRF, rate limiting, input validation)
-- **Error Handling** - Minimal
-- **Testing** - Tidak ada
-- **Environment Config** - Perlu .env setup
-- **Deployment Ready** - Perlu setup untuk production
+### ⚠️ Yang dulu kurang — sekarang (status 31 Oktober)
+- **Autentikasi & Authorization** - ✅ NextAuth v5 (Credentials + JWT), proteksi per role di layout & tiap API
+- **Database** - ✅ PostgreSQL + Prisma (14 tabel); skema juga tersedia sebagai SQL murni di `supabase/migrations/`
+- **Backend/API** - ✅ API routes lengkap untuk seluruh alur + endpoint AI
+- **User Management** - ✅ profil UMKM/influencer, peran, sesi
+- **File Upload** - ✅ Vercel Blob bila ada token, fallback input URL
+- **Payment/Escrow** - ✅ simulasi escrow dengan animasi sukses/gagal (gateway sungguhan sengaja ditunda)
+- **Real AI Matching** - ✅ hibrida: mesin aturan + DeepSeek (`/api/ai/*`), tetap jalan tanpa kunci API
+- **Notifications** - ✅ in-app (bell + polling). Email: belum (P1)
+- **Email/Notification System** - ⏳ belum (P1)
+- **Validation & Security** - ✅ Zod, cek sesi, rate limit AI, input dipangkas
+- **Error Handling** - ✅ fallback aturan + pesan terbaca di UI
+- **Testing** - ✅ `scripts/smoke-test.mjs` (51 pemeriksaan end-to-end) + `scripts/test-env-block.sh` (16 pemeriksaan naskah deploy)
+- **Environment Config** - ✅ `.env.example` (dev) dan `.env.production.example` (VPS)
+- **Deployment Ready** - ✅ naskah VPS + PM2 + Caddy, dan tetap bisa ke Vercel
 
 ---
 
@@ -88,8 +92,8 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Buat .env.example | ✅ Done | P0 | |
 | Update package.json dengan scripts prisma | ✅ Done | P0 | `db:push`, `db:seed`, `db:studio` |
 | Install dependencies | ✅ Done | P0 | `npm install` selesai |
-| Setup DATABASE_URL di .env | ⏳ To Do | P0 | **Masih placeholder** — isi connection string Supabase/Neon |
-| Migrate & generate Prisma client | 🟡 Partial | P0 | `prisma generate` ✅; `prisma db push` menunggu DATABASE_URL |
+| Setup DATABASE_URL di .env | ✅ Done | P0 | PostgreSQL lokal `kolabora_dev` untuk pengembangan; `.env` (gitignore) |
+| Migrate & generate Prisma client | ✅ Done | P0 | `prisma generate` + `prisma db push` jalan; skema juga direkam di `supabase/migrations/0001_init.sql` |
 | User profile CRUD (per role) | ✅ Done | P0 | `/api/profile` + halaman profil UMKM & influencer |
 
 ### Phase 2: Core Features (Campaign, Matching, Collaboration)
@@ -122,9 +126,31 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Security hardening (auth, role check, CSRF) | ✅ Done | P0 | Session check per API + role guard |
 | Responsive design check | ✅ Done | P1 | Layout dashboard collapse |
 | Performance optimization (serverless-friendly) | ✅ Done | P1 | Query Prisma terbatas, polling ringan |
-| .env.example lengkap | ✅ Done | P0 | |
-| Setup untuk Vercel deployment (tanpa VPS) | ✅ Done | P0 | README + Blob |
-| Deployment (Vercel + Neon/Supabase) | ⏳ To Do | P0 | Menunggu DATABASE_URL production |
+| .env.example lengkap | ✅ Done | P0 | `.env.example` (dev) + `.env.production.example` (VPS) |
+| Setup untuk Vercel deployment (tanpa VPS) | ✅ Done | P0 | README bagian 6 + Blob opsional |
+| Deployment (Vercel + Neon/Supabase) | 🟡 Ready | P0 | Alternatif; jalur utama pindah ke VPS (Phase 5) |
+
+### Phase 5: AI Sungguhan, Pengujian, Deploy VPS (PRIORITAS TINGGI — selesai 31 Okt)
+| Task | Status | Priority | Notes |
+|---|---|---|---|
+| Klien AI DeepSeek (tanpa dependency) | ✅ Done | P0 | `src/lib/ai.ts` — timeout 40 dtk, retry 429/5xx, mode JSON, perbaikan JSON rusak |
+| Endpoint AI | ✅ Done | P0 | `/api/ai/{status,content,brief,score-campaign,match}` + `/api/health` publik |
+| Pencocokan hibrida (aturan + AI) | ✅ Done | P0 | `blendScores()`; hasil aturan tetap tampil saat AI mati/gagal |
+| Penilai kelayakan brief | ✅ Done | P0 | `src/lib/campaign-score.ts`, skor instan di form buat campaign |
+| UI terhubung ke AI sungguhan | ✅ Done | P0 | buat campaign, content assistant, skill assistant, smart matching |
+| Kuota AI per pengguna | ✅ Done | P0 | `src/lib/rate-limit.ts` (per menit/jam/hari) |
+| Uji end-to-end seluruh alur | ✅ Done | P0 | `scripts/smoke-test.mjs` — **51/51 lulus** (login→campaign→lamar→escrow→review→selesai) |
+| Uji naskah deploy | ✅ Done | P0 | `scripts/test-env-block.sh` — 16/16 lulus (`npm run test:deploy`) |
+| Skema & data demo sebagai SQL | ✅ Done | P0 | `supabase/migrations/0001_init.sql`, `0002_seed_demo.sql` (idempoten, sudah diverifikasi ulang) |
+| Naskah pasang/perbarui VPS | ✅ Done | P0 | `scripts/deploy-vps.sh` — Node 22, Postgres, PM2, Caddy, firewall, uji `.env` aman |
+| Konfigurasi PM2 + Caddy | ✅ Done | P0 | `ecosystem.config.js`, `deploy/Caddyfile` (HTTPS, header, body 10 MB) |
+| Pencadangan basis data | ✅ Done | P0 | `scripts/backup-db.sh` — pemulihan `.dump` dan `.sql` sudah diverifikasi sungguhan |
+| Panduan deploy berbahasa Indonesia | ✅ Done | P0 | `docs/DEPLOY-VPS.md` (DNS, AI, update, rollback, backup, alternatif Vercel) |
+| Menempelkan `DEEPSEEK_API_KEY` | ⏳ Menunggu pengguna | P0 | isi di `.env` lokal / `.env` VPS lalu reload |
+| Menjalankan deploy di VPS `kolabora.tech` | ⏳ To Do | P0 | butuh IP/akses SSH — `bash scripts/deploy-vps.sh --domain kolabora.tech --seed --test` |
+| Rating & review timbal balik (lihat Phase 3) | ⏳ To Do | P1 | setelah kolaborasi COMPLETED |
+| Notifikasi email | ⏳ To Do | P1 | butuh layanan SMTP |
+| Payment gateway sungguhan (Midtrans/Xendit) | ⏳ To Do | P2 | sengaja masih simulasi |
 
 
 ---
@@ -132,59 +158,72 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 ## 5. Keputusan & Konfirmasi (Sudah Dikonfirmasi)
 
 ### A. Arsitektur & Tech Stack
-1. **Database** - **Postgres gratisan** (Neon/Supabase) yang bisa dipakai di Vercel tanpa VPS. Akan pakai **Prisma**.
-2. **Authentication** - **NextAuth.js v5 (Auth.js)** dengan credentials provider + role-based access (UMKM/Influencer).
-3. **File Storage** - **Vercel Blob**.
-4. **Payment Gateway** - **Skip dulu**. Cukup mockup dengan animasi "transaksi berhasil/gagal" pura-pura (untuk simulasi escrow).
-5. **Real-time Chat** - Butuh **real-time** (A kirim, B langsung nerima). Akan pakai pendekatan yang compatible dengan serverless/Vercel (polling dengan interval pendek atau Server-Sent Events). Hindari self-hosted websocket server.
+1. **Database** - **PostgreSQL + Prisma**. Pengembangan memakai PostgreSQL lokal; produksi boleh PostgreSQL di VPS (dibuat otomatis oleh naskah deploy) atau Supabase/Neon gratis (pooler port 6543 + `?pgbouncer=true`).
+2. **Authentication** - **NextAuth.js v5 (Auth.js)** dengan credentials provider + role-based access (UMKM/INFLUENCER).
+3. **File Storage** - **Vercel Blob** bila token tersedia; tanpa token unggah memakai input URL.
+4. **Payment Gateway** - **Skip dulu**. Cukup mockup dengan animasi "transaksi berhasil/gagal" (simulasi escrow).
+5. **Real-time Chat** - Pendekatan yang cocok untuk serverless: **polling 3,5 detik**, bukan websocket self-hosted.
+6. **AI** - **DeepSeek API** (`deepseek-chat`) lewat `src/lib/ai.ts`, dengan **mesin aturan sebagai fallback** sehingga aplikasi tetap jalan dan tanpa biaya ketika kunci API belum diisi.
 
 ### B. Scope & Prioritas
-6. **Prioritas pertama** - **Full flow** (campaign → apply/propose → chat → collaboration) biar bisa dipakai real
-7. **Target** - **Full production-ready**, disesuaikan untuk hosting gratisan (Vercel) tanpa sewa VPS. Package & struktur akan dioptimasi untuk serverless.
-8. **Data lokal** - **Mulai fresh** (focus ke database). localStorage bisa dipertahankan sebagai fallback/dev aja.
-9. **AI Matching** - **Rule-based sederhana** berdasarkan niche, lokasi, engagement, followers, dll.
+7. **Prioritas pertama** - **Full flow** (campaign -> apply/propose -> chat -> collaboration) supaya benar-benar bisa dipakai.
+8. **Target** - **Full production-ready**: tidak ada bug pada alur utama, ada uji otomatis, dan mudah deploy ulang.
+9. **Data lokal** - **Mulai fresh** (fokus ke database). localStorage hanya untuk pengembangan.
+10. **Matching** - **Hibrida**: perhitungan aturan (niche, lokasi, followers, engagement, budget) selalu jalan, lalu digabungkan dengan penilaian AI.
+11. **Bahasa** - UI, pesan galat, prompt AI, dan dokumentasi memakai **Bahasa Indonesia**.
 
 ### C. Deployment
-10. **Deployment target** - **Vercel** (gratisan)
-11. **Environment** - Setup dari awal (.env.example + konfigurasi)
+12. **Target utama** - **VPS sendiri** dengan domain `kolabora.tech`: Next.js hasil build di **PM2** + **Caddy** (HTTPS otomatis) + PostgreSQL lokal. Satu naskah: `scripts/deploy-vps.sh`.
+13. **Alternatif** - **Vercel** gratis (README bagian 6) tetap didukung.
+14. **Environment** - `.env.example` untuk pengembangan, `.env.production.example` untuk produksi; naskah deploy tidak menimpa nilai yang sudah diisi.
+15. **Pencadangan** - `scripts/backup-db.sh` (cron harian disarankan): `pg_dump` format custom atau SQL teks.
 
 ---
 
 ## 6. Progress Terbaru & Next Steps
 
-### Sudah Dikerjakan
-- ✅ Full audit kodebase
-- ✅ Brief & tracking document
-- ✅ Prisma schema lengkap (User, Profiles, Campaign, Application, Collaboration, Messages, Review, Notification, Portfolio)
-- ✅ NextAuth.js v5 setup dengan Credentials provider + role-based (UMKM/INFLUENCER)
-- ✅ API routes lengkap: auth, campaigns (+detail/apply), applications, collaborations (+state machine), messages, reviews, upload, notifications, profile, portfolio, matching, payments
-- ✅ Proteksi route server-side per role + pengecekan session per API
-- ✅ Login & Register functional (terhubung API)
-- ✅ Campaign management UMKM (list, create, detail + kelola pelamar)
-- ✅ Discover campaign & apply untuk influencer
-- ✅ AI Smart Matching rule-based (dua arah) dengan modal proposal/lamaran
-- ✅ Chat DB + polling 3,5 detik, unread badge, kirim pesan
-- ✅ Mock payment/escrow dengan animasi sukses/gagal (`/api/payments/simulate`)
-- ✅ Review konten: submit (influencer), approve/revisi (UMKM)
-- ✅ Dashboard & analytics real dari database (UMKM & influencer)
-- ✅ Profil & portfolio (upload Blob opsional, fallback URL)
-- ✅ Notifikasi in-app (bell + polling + halaman terkait)
-- ✅ `.env.example`, README setup/deploy, `prisma/seed.mjs`, script `db:seed`
-- ✅ TypeScript check bersih (`npx tsc --noEmit`)
+### Sudah Dikerjakan (31 Oktober)
+**Fondasi & alur inti**
+- ✅ Skema Prisma 14 tabel + salinan SQL (`supabase/migrations/0001_init.sql`, `0002_seed_demo.sql`)
+- ✅ NextAuth v5 (Credentials + JWT) dengan peran UMKM/INFLUENCER/BRAND
+- ✅ API lengkap: auth, campaigns, applications, collaborations (mesin status), messages, reviews, notifications, profile, portfolio, matching, payments
+- ✅ Proteksi per peran di layout + pengecekan sesi di setiap API
+- ✅ Alur penuh teruji: buat campaign -> lamar -> terima -> chat -> deal -> escrow -> produksi -> kirim konten -> review -> cairkan -> COMPLETED
 
-### Next Steps (Langkah Selanjutnya)
-1. **Isi `DATABASE_URL`** di `.env` dengan connection string Supabase (pooler port 6543) atau Neon.
-2. **Push schema**: `npx prisma db push`.
-3. **Seed data demo**: `npm run db:seed`.
-4. **Jalankan dev server & smoke test alur lengkap**:
-   register → login → buat campaign → apply → terima lamaran → chat → agree → escrow → produksi → kirim konten → review → approve → cairkan escrow.
-5. **`npm run build`** untuk memastikan build production bersih.
-6. **Deploy ke Vercel** dengan env yang sama (ganti `AUTH_URL`/`NEXT_PUBLIC_APP_URL` ke domain Vercel).
-7. **Opsional**: aktifkan Vercel Blob (`BLOB_READ_WRITE_TOKEN`) agar upload file aktif.
-8. **Opsional (P1)**: rating & review setelah kolaborasi selesai, admin panel/dispute.
+**AI sungguhan (DeepSeek)**
+- ✅ Klien AI tanpa dependency eksternal: timeout, retry, mode JSON, perbaikan JSON rusak (`src/lib/ai.ts`)
+- ✅ Endpoint `POST /api/ai/{match,content,brief,score-campaign}` + `GET /api/ai/status?test=1`
+- ✅ Pencocokan hibrida (aturan + AI) dan penilai kelayakan brief (40% aturan / 60% AI)
+- ✅ Halaman buat campaign: skor kesiapan langsung, "Periksa dengan AI", "Susun draft brief dengan AI"
+- ✅ Content assistant (influencer) & skill assistant (UMKM) memakai AI asli
+- ✅ Kuota AI per akun per menit/jam/hari; prompt hanya memuat data milik pengguna yang login
+- ✅ Fallback aturan tetap tampil ketika AI mati, gagal, atau kunci belum diisi
 
-**Catatan:** Semua setup disesuaikan untuk hosting gratis di Vercel tanpa VPS. Chat memakai polling agar kompatibel serverless. Payment hanya simulasi dengan animasi, bukan gateway sungguhan.
+**Kualitas & operasional**
+- ✅ `scripts/smoke-test.mjs`: 51 pemeriksaan end-to-end (halaman, API, AI, eskalasi status) -> **51/51 lulus**
+- ✅ `scripts/test-env-block.sh`: 16 pemeriksaan penulisan `.env` oleh naskah VPS -> **16/16 lulus**
+- ✅ `npx tsc --noEmit` bersih dan `npm run build` berhasil (semua route ikut ter-generate)
+- ✅ `/api/health` melaporkan versi, kondisi database, dan status konfigurasi AI
+- ✅ `scripts/deploy-vps.sh` (pasang + perbarui VPS), `ecosystem.config.js` (PM2), `deploy/Caddyfile` (HTTPS)
+- ✅ `scripts/backup-db.sh` — cadangan & pemulihan diverifikasi sungguhan (14 tabel, data ikut)
+- ✅ `docs/DEPLOY-VPS.md` + README diperbarui (AI, env, VPS, Vercel, scripts)
 
+### Yang Menunggu
+1. **Kunci DeepSeek** — isi `DEEPSEEK_API_KEY="sk-..."` di `.env` (jangan dituliskan di percakapan), lalu:
+   ```bash
+   curl -s "http://localhost:3000/api/ai/status?test=1"   # harus "ok": true
+   npm run smoke                                            # aiUsed=true pada fitur AI
+   ```
+2. **Akses VPS** — setelah IP/SSH tersedia:
+   ```bash
+   bash scripts/deploy-vps.sh --domain kolabora.tech --seed --test
+   BASE_URL=https://kolabora.tech npm run smoke
+   ```
+3. **Memilih basis data produksi** — PostgreSQL lokal di VPS (otomatis) atau Supabase (jalankan dua file SQL di bagian 7 README, tempel string pooler ke `DATABASE_URL`).
+4. **P1** — rating dua arah setelah COMPLETED, notifikasi email, admin panel/mediasi sengketa.
+5. **P2** — payment gateway sungguhan (Midtrans/Xendit) menggantikan simulasi.
+
+**Catatan:** escrow masih simulasi (tanpa gerbang pembayaran); chat memakai polling agar cocok di serverless maupun VPS; kunci AI hanya dibaca server dan tidak pernah dikirim ke browser.
 
 ---
 

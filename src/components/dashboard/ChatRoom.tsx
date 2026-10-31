@@ -128,18 +128,22 @@ export default function ChatRoom({
 
   useEffect(() => {
     if (!activeId) return;
-    setLoadingMessages(true);
-    setMessages([]);
-    lastTimestamp.current = null;
 
     let cancelled = false;
-    void loadMessages(activeId).finally(() => {
-      if (!cancelled) setLoadingMessages(false);
-    });
-
     const id = setInterval(() => {
-      void loadMessages(activeId, lastTimestamp.current);
+      if (!cancelled) void loadMessages(activeId, lastTimestamp.current);
     }, 3500);
+
+    // Fungsi async lokal: pengosongan pesan & status loading tidak setState
+    // secara sinkron di dalam effect.
+    const muat = async () => {
+      setLoadingMessages(true);
+      setMessages([]);
+      lastTimestamp.current = null;
+      await loadMessages(activeId);
+      if (!cancelled) setLoadingMessages(false);
+    };
+    void muat();
 
     return () => {
       cancelled = true;

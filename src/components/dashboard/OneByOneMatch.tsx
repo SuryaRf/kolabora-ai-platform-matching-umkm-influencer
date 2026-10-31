@@ -35,6 +35,10 @@ export interface MatchItem {
   budget?: string;
   reasons: MatchReason[];
   stats: MatchStat[];
+  /** Catatan singkat dari AI (bila pencocokan AI dipakai) */
+  note?: string;
+  /** Risiko/hal yang perlu diwaspadai menurut AI */
+  risk?: string;
 }
 
 interface OneByOneMatchProps {
@@ -43,6 +47,8 @@ interface OneByOneMatchProps {
   ctaLabel: string;
   ctaSuccess: string;
   historyHref?: string;
+  /** Judul blok alasan; ubah bila sumber rekomendasi berbeda (AI vs aturan). */
+  reasonsTitle?: string;
   /**
    * Called when the user taps the CTA. Return `false` to keep the current card
    * (e.g. the user cancelled the follow-up dialog) or `true`/undefined to move
@@ -57,6 +63,7 @@ export default function OneByOneMatch({
   ctaLabel,
   ctaSuccess,
   historyHref,
+  reasonsTitle = "Alasan rekomendasi",
   onMatch,
 }: OneByOneMatchProps) {
   const [index, setIndex] = useState(0);
@@ -234,7 +241,7 @@ export default function OneByOneMatch({
 
               <div className="mt-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4">
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-                  Alasan AI merekomendasikan
+                  {reasonsTitle}
                 </p>
                 <div className="space-y-2.5">
                   {current.reasons.map((r, i) => (
@@ -259,6 +266,21 @@ export default function OneByOneMatch({
                     </div>
                   ))}
                 </div>
+                {(current.note || current.risk) && (
+                  <div className="mt-3 pt-3 border-t border-zinc-200/70 dark:border-zinc-700 space-y-2">
+                    {current.note && (
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed flex items-start gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-kolabora flex-shrink-0 mt-0.5" />
+                        <span>{current.note}</span>
+                      </p>
+                    )}
+                    {current.risk && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-2.5 py-2 leading-relaxed">
+                        Perlu diwaspadai: {current.risk}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">

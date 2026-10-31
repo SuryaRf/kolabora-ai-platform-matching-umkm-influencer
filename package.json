@@ -11,7 +11,10 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node --env-file=.env prisma/seed.mjs",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "smoke": "node scripts/smoke-test.mjs",
+    "test:deploy": "bash scripts/test-env-block.sh",
+    "backup:db": "bash scripts/backup-db.sh"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",

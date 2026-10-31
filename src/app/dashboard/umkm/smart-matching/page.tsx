@@ -73,7 +73,11 @@ export default function UMKMSmartMatching() {
   }, [category, location, budget]);
 
   useEffect(() => {
-    void load();
+    // Fungsi async lokal: setState tidak terjadi sinkron di dalam effect.
+    const muat = async () => {
+      await load();
+    };
+    void muat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

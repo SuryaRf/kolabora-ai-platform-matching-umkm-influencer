@@ -1,0 +1,52 @@
+# ============================================================================
+# Caddyfile untuk kolabora.tech  (reverse proxy + HTTPS otomatis Let's Encrypt)
+#
+# Pasang:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Sebelum reload, pastikan DNS sudah mengarah ke IP VPS:
+#   A     @      -> IP_VPS
+#   A     www    -> IP_VPS
+# Caddy akan minta sertifikat sendiri saat pertama kali traffic masuk.
+# ============================================================================
+
+{
+	# Log format ringkas
+	email admin@kolabora.tech
+}
+
+kolabora.tech www.kolabora.tech {
+	encode zstd gzip
+
+	# Batas ukuran berkas unggahan (selaras /api/upload)
+	request_body {
+		max_size 10MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Aset statis Next.js sudah bercap versi di namanya -> cache lama aman
+	@static path /_next/static/* /favicon.ico
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	access_log {
+		output file /var/log/caddy/kolabora.access.log
+		format console
+	}
+
+	reverse_proxy 127.0.0.1:3000 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+# Bila memakai subdomain staging, tambahkan blok:
+# staging.kolabora.tech {
+#   reverse_proxy 127.0.0.1:3001
+# }

@@ -254,6 +254,7 @@ umask 022
 ok "Konfigurasi env siap (DATABASE_URL, AUTH_URL=https://${DOMAIN}, AUTH_SECRET)"
 if is_placeholder "$(env_value DEEPSEEK_API_KEY)"; then
   warn "DEEPSEEK_API_KEY masih kosong — fitur AI memakai perhitungan aturan."
+  warn "Isi tanpa menampilkan kuncinya: bash scripts/set-key.sh  (lalu: pm2 reload kolabora --update-env)"
 fi
 
 # ---------------------------------------------------------------- pasang & build

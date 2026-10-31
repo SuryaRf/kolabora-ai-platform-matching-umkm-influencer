@@ -13,7 +13,9 @@
     "db:seed": "node --env-file=.env prisma/seed.mjs",
     "db:studio": "prisma studio",
     "smoke": "node scripts/smoke-test.mjs",
+    "set-key": "bash scripts/set-key.sh",
     "test:deploy": "bash scripts/test-env-block.sh",
+    "test:keys": "bash scripts/test-set-key.sh",
     "backup:db": "bash scripts/backup-db.sh"
   },
   "dependencies": {

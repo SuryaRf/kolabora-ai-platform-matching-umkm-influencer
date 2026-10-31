@@ -95,11 +95,21 @@ ingin pindah ke PostgreSQL lokal di VPS, tambahkan `--reset-db-url`.
 
 ## 3. Mengaktifkan AI DeepSeek
 
+AI aktif bila `DEEPSEEK_API_KEY` berisi kunci berformat `sk-...`. Isi lewat
+terminal (nilainya tidak akan tampil di layar maupun riwayat shell — jangan
+menempelkan kunci ke chat/log):
+
 ```bash
 cd /var/www/kolabora
-nano .env                      # isi DEEPSEEK_API_KEY="sk-..."
-bash scripts/deploy-vps.sh --skip-build   # reload aplikasi
+npm run set-key                # ditempel lewat input tersembunyi
+npm run set-key -- --check     # pastikan terisi, tanpa mengubah apa pun
+pm2 reload kolabora --update-env
 ```
+
+Pilihan lain: `nano .env` lalu isi `DEEPSEEK_API_KEY="sk-..."`, atau
+`bash scripts/set-key.sh --env /var/www/kolabora/.env` dari direktori mana pun.
+Naskah membuat salinan sementara `.env` ber-izin `0600` dan hanya mengganti baris
+variabel target.
 
 Verifikasi (harus `test.ok: true`, latency ±1–3 detik):
 
@@ -109,7 +119,8 @@ curl -s http://127.0.0.1:3000/api/health | head -c 400
 ```
 
 Fitur AI aktif di: **AI Smart Matching**, **AI Content Assistant**,
-**AI Skill Assistant**, dan penilai brief pada **Buat Campaign**.
+**AI Skill Assistant**, penilai brief pada **Buat Campaign**, **Optimizer Profil**
+(`profile-optimizer`), dan **Kartu Tarif** (`rate-recommendation`).
 Tanpa kunci, semua fitur itu otomatis memakai perhitungan aturan
 (tanpa biaya, tetap jalan).
 

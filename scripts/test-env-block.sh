@@ -19,9 +19,9 @@ check() { # nama, kondisi(0/1), detail
 # pemrosesan .env sampai peringatan DEEPSEEK_API_KEY.
 BLOCK_START=$(grep -n '^# Ganti (atau tambahkan) satu kunci' "$DEPLOY" | cut -d: -f1)
 WARN_LINE=$(grep -n "DEEPSEEK_API_KEY masih kosong" "$DEPLOY" | cut -d: -f1)
-# Sertakan baris penutup "fi" sesudahnya agar potongan tetap utuh.
-BLOCK_END=$((WARN_LINE + 1))
 [[ -n "$BLOCK_START" && -n "$WARN_LINE" ]] || { echo "GAGAL: blok .env tidak ditemukan di $DEPLOY"; exit 1; }
+# Ambil sampai baris "fi" penutup blok itu, supaya jumlah pesan peringatan boleh berubah.
+BLOCK_END=$(awk -v dari="$WARN_LINE" 'NR >= dari { print NR; if ($0 ~ /^[[:space:]]*fi[[:space:]]*$/) exit }' "$DEPLOY" | tail -1)
 sed -n "${BLOCK_START},${BLOCK_END}p" "$DEPLOY" > "$WORK/block.sh"
 [[ "$(tail -1 "$WORK/block.sh" | tr -d '[:space:]')" == "fi" ]] || { echo "GAGAL: potongan blok tidak lengkap"; tail -3 "$WORK/block.sh"; exit 1; }
 bash -n "$WORK/block.sh" || { echo "GAGAL: potongan blok tidak valid sebagai bash"; exit 1; }

@@ -45,7 +45,7 @@
 - **Email/Notification System** - ⏳ belum (P1)
 - **Validation & Security** - ✅ Zod, cek sesi, rate limit AI, input dipangkas
 - **Error Handling** - ✅ fallback aturan + pesan terbaca di UI
-- **Testing** - ✅ `scripts/smoke-test.mjs` (81 pemeriksaan end-to-end) + `scripts/test-env-block.sh` (16 pemeriksaan naskah deploy)
+- **Testing** - ✅ `scripts/smoke-test.mjs` (81 pemeriksaan end-to-end) + `scripts/test-env-block.sh` (16) + `scripts/test-set-key.sh` (27)
 - **Environment Config** - ✅ `.env.example` (dev) dan `.env.production.example` (VPS)
 - **Deployment Ready** - ✅ naskah VPS + PM2 + Caddy, dan tetap bisa ke Vercel
 
@@ -140,13 +140,13 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | UI terhubung ke AI sungguhan | ✅ Done | P0 | buat campaign, content assistant, skill assistant, smart matching |
 | Kuota AI per pengguna | ✅ Done | P0 | `src/lib/rate-limit.ts` (per menit/jam/hari) |
 | Uji end-to-end seluruh alur | ✅ Done | P0 | `scripts/smoke-test.mjs` — **81/81 lulus** (login→campaign→lamar→escrow→review→selesai) |
-| Uji naskah deploy | ✅ Done | P0 | `scripts/test-env-block.sh` — 16/16 lulus (`npm run test:deploy`) |
+| Uji naskah deploy | ✅ Done | P0 | `scripts/test-env-block.sh` — 16/16 lulus (`npm run test:deploy`); `scripts/test-set-key.sh` — 27/27 lulus (`npm run test:keys`) |
 | Skema & data demo sebagai SQL | ✅ Done | P0 | `supabase/migrations/0001_init.sql`, `0002_seed_demo.sql` (idempoten, sudah diverifikasi ulang) |
 | Naskah pasang/perbarui VPS | ✅ Done | P0 | `scripts/deploy-vps.sh` — Node 22, Postgres, PM2, Caddy, firewall, uji `.env` aman |
 | Konfigurasi PM2 + Caddy | ✅ Done | P0 | `ecosystem.config.js`, `deploy/Caddyfile` (HTTPS, header, body 10 MB) |
 | Pencadangan basis data | ✅ Done | P0 | `scripts/backup-db.sh` — pemulihan `.dump` dan `.sql` sudah diverifikasi sungguhan |
 | Panduan deploy berbahasa Indonesia | ✅ Done | P0 | `docs/DEPLOY-VPS.md` (DNS, AI, update, rollback, backup, alternatif Vercel) |
-| Menempelkan `DEEPSEEK_API_KEY` | ⏳ Menunggu pengguna | P0 | isi di `.env` lokal / `.env` VPS lalu reload |
+| Menempelkan `DEEPSEEK_API_KEY` | ⏳ Menunggu pengguna | P0 | `npm run set-key` (input tersembunyi, izin 0600) lalu `pm2 reload --update-env` / restart dev; cek: `npm run set-key -- --check` |
 | Menjalankan deploy di VPS `kolabora.tech` | ⏳ To Do | P0 | butuh IP/akses SSH — `bash scripts/deploy-vps.sh --domain kolabora.tech --seed --test` |
 | Rating & review timbal balik (lihat Phase 3) | ⏳ To Do | P1 | setelah kolaborasi COMPLETED |
 | Notifikasi email | ⏳ To Do | P1 | butuh layanan SMTP |
@@ -172,6 +172,7 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Rating & review timbal balik | ⏳ To Do | P1 | fiturnya belum dibuat (bukan angka fiktif): penilaian dua arah setelah COMPLETED |
 | Halaman analytics kreator & UMKM | ✅ Done | P0 | angka dihitung dari Prisma/API, bukan statistik contoh |
 | Tidak ada angka fiktif di UI dashboard | ✅ Diperiksa | P0 | penelusuran pola `mock`, `trend:`, `prime time`, peringkat berbayar → tidak ada yang tersisa |
+| Pengisi kunci AI tanpa bocoran | ✅ Done | P0 | `scripts/set-key.sh` (`npm run set-key`, input tersembunyi, chmod 0600, `--check`) + uji `scripts/test-set-key.sh` **27/27** |
 
 
 ---
@@ -231,6 +232,7 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 **Kualitas & operasional**
 - ✅ `scripts/smoke-test.mjs`: 81 pemeriksaan end-to-end (halaman, API, AI, eskalasi status, penjaga peran, filter pencocokan, undangan kolaborasi, agenda kalender) -> **81/81 lulus**
 - ✅ `scripts/test-env-block.sh`: 16 pemeriksaan penulisan `.env` oleh naskah VPS -> **16/16 lulus**
+- ✅ `scripts/test-set-key.sh`: 27 pemeriksaan pengisian kunci (tolak format salah/terlalu pendek, karakter khusus, izin 0600, nilai tidak pernah dicetak) -> **27/27 lulus**
 - ✅ `npx tsc --noEmit` bersih dan `npm run build` berhasil (semua route ikut ter-generate)
 - ✅ `/api/health` melaporkan versi, kondisi database, dan status konfigurasi AI
 - ✅ `scripts/deploy-vps.sh` (pasang + perbarui VPS), `ecosystem.config.js` (PM2), `deploy/Caddyfile` (HTTPS)

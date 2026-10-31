@@ -39,6 +39,16 @@ createdb kolabora_dev
 # DATABASE_URL="postgresql/<user>@localhost:5432/kolabora_dev?schema=public"
 ```
 
+Tanpa kunci AI, semua fitur AI berjalan dalam mode perhitungan aturan. Untuk
+memakai DeepSeek asli, isi kuncinya lewat terminal (nilainya tidak ditampilkan
+di layar maupun riwayat shell), lalu mulai ulang server:
+
+```bash
+npm run set-key             # tempel sk-... lalu Enter
+npm run set-key -- --check  # pastikan terisi
+# lalu mulai ulang server dev / pm2 reload supaya variabel baru dibaca
+```
+
 ### Environment variables
 
 | Variable | Wajib | Keterangan |
@@ -48,7 +58,7 @@ createdb kolabora_dev
 | `AUTH_URL` | ✅ | `http://localhost:3000` saat lokal; `https://kolabora.tech` saat deploy |
 | `NEXT_PUBLIC_APP_URL` | ✅ | Sama seperti `AUTH_URL` (dipakai tautan & notifikasi) |
 | `AUTH_TRUST_HOST` | ⬜ di VPS | Wajib `true` bila aplikasi berada di belakang proxy (Caddy/nginx) |
-| `DEEPSEEK_API_KEY` | ⬜ | Kunci AI dari <https://platform.deepseek.com/api_keys>. **Tanpa kunci, fitur AI memakai perhitungan aturan.** |
+| `DEEPSEEK_API_KEY` | ⬜ | Kunci AI dari <https://platform.deepseek.com/api_keys>. **Tanpa kunci, fitur AI memakai perhitungan aturan.** Isi lewat `npm run set-key` supaya nilainya tidak tampil di layar maupun riwayat shell. |
 | `DEEPSEEK_MODEL` | ⬜ | default `deepseek-chat` |
 | `DEEPSEEK_BASE_URL` | ⬜ | default `https://api.deepseek.com` |
 | `DEEPSEEK_TIMEOUT_MS` | ⬜ | default `40000` |
@@ -216,7 +226,10 @@ src/app/api/insights/...             # data halaman: influencer & umkm
 src/app/api/health/route.ts          # probe database + AI + versi
 src/app/api/collaborations/[id]/action/route.ts  # mesin status kolaborasi
 scripts/deploy-vps.sh                # pasang/perbarui VPS
+scripts/set-key.sh                   # isi kunci AI (input tersembunyi, chmod 0600)
 scripts/smoke-test.mjs               # uji end-to-end seluruh alur
+scripts/test-env-block.sh            # uji cara deploy-vps.sh menulis .env
+scripts/test-set-key.sh              # uji cara set-key.sh mengisi kunci
 scripts/backup-db.sh                 # cadangan Postgres
 docs/DEPLOY-VPS.md                   # panduan VPS lengkap
 ```
@@ -237,7 +250,9 @@ npm run db:push         # sinkronkan skema ke DB
 npm run db:seed         # data demo
 npm run db:studio       # Prisma Studio
 npm run smoke           # uji end-to-end (login→campaign→lamar→escrow→review→selesai)
-npm run test:deploy     # uji blok .env pada naskah VPS
+npm run set-key         # isi DEEPSEEK_API_KEY diam-diam (nilai tidak pernah tampil)
+npm run test:deploy     # uji blok .env pada naskah VPS (16 pemeriksaan)
+npm run test:keys       # uji naskah pengisi kunci .env (27 pemeriksaan)
 npm run backup:db       # cadangkan basis data
 ```
 
@@ -254,8 +269,13 @@ selesai), seluruh API (termasuk penjaga 401/403 per peran), endpoint AI beserta
 fallback dan pembatas kuota, perhitungan tarif & skor profil, undangan kolaborasi
 dari halaman Highlights, agenda kalender, dan 32 halaman yang harus ter-render.
 
-Status saat ini: **81/81 pemeriksaan lulus** di dev lokal (AI dalam mode aturan
-karena kunci belum diisi).
+Dua naskah pengujian lain memeriksa perkakas deploy, bukan aplikasinya:
+`npm run test:deploy` (16 butir — cara `scripts/deploy-vps.sh` menulis `.env`) dan
+`npm run test:keys` (27 butir — cara `scripts/set-key.sh` mengisi kunci tanpa
+membocorkannya). Keduanya hanya memakai direktori sementara dan kunci palsu.
+
+Status saat ini: **81/81** lulus di dev lokal (AI dalam mode aturan karena kunci
+belum diisi), ditambah **16/16** dan **27/27** untuk naskah deploy.
 
 ---
 

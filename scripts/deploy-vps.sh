@@ -164,6 +164,12 @@ if [[ $WITH_DB -eq 1 ]]; then
   fi
   # Selaraskan sandi peran dengan .dbpass (memulihkan keadaan bila pernah beda).
   as_postgres psql -qc "ALTER ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}'"
+  # Prisma membuat "shadow database" sementara saat `db push` / `migrate`,
+  # jadi peran aplikasi butuh hak CREATEDB — kalau tidak, perintah itu menggantung.
+  if [[ "$(as_postgres psql -tAc "SELECT rolcreatedb FROM pg_roles WHERE rolname='${DB_USER}'")" != "t" ]]; then
+    as_postgres psql -qc "ALTER ROLE ${DB_USER} CREATEDB"
+    ok "Hak CREATEDB diberikan ke '${DB_USER}' (diperlukan prisma db push / migrate)"
+  fi
   if as_postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
     ok "Database '${DB_NAME}' sudah ada"
   else
@@ -301,7 +307,11 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
   npx prisma generate --schema=prisma/schema.prisma
   log "Menyelaraskan skema database (prisma db push)"
   # Prisma dan Next.js membaca file .env di direktori aplikasi sendiri.
-  npx prisma db push --schema=prisma/schema.prisma
+  # Dibatasi 10 menit: tanpa hak CREATEDB, perintah ini pernah menggantung
+  # tanpa pesan galat dan membuat deploy terlihat "sedang jalan" selamanya.
+  if ! timeout 600 npx prisma db push --schema=prisma/schema.prisma; then
+    die "prisma db push gagal atau melebihi 10 menit. Cek DATABASE_URL di $ENV_FILE dan hak CREATEDB peran database."
+  fi
   if [[ $DO_SEED -eq 1 ]]; then
     log "Mengisi data demo"
     npm run db:seed

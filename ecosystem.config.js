@@ -8,7 +8,9 @@ module.exports = {
       name: "kolabora",
       cwd: __dirname,
       script: "node_modules/next/dist/bin/next",
-      args: "start",
+      // Hanya menerima koneksi dari proxy di mesin yang sama (nginx/Caddy).
+      // Port Node tidak boleh terbuka ke publik walau firewall sedang diubah.
+      args: `start --hostname ${process.env.APP_HOST || "127.0.0.1"}`,
       instances: 1,
       exec_mode: "fork",
       // Next.js mengelola sendiri worker-nya; 1 proses lebih aman untuk Prisma + pooling.

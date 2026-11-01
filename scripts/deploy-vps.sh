@@ -135,27 +135,47 @@ if [[ $WITH_DB -eq 1 ]]; then
   ok "PostgreSQL: $(psql --version | awk '{print $3}')"
 
   DB_PASSWORD_FILE="$APP_DIR/.dbpass"
-  if [[ ! -f "$DB_PASSWORD_FILE" ]]; then
+  # APP_DIR bisa belum ada saat VPS masih kosong.
+  if [[ ! -d "$APP_DIR" ]]; then
+    $SUDO mkdir -p "$APP_DIR"
+    $SUDO chown "$(id -u):$(id -g)" "$APP_DIR"
+  fi
+  if [[ -f "$DB_PASSWORD_FILE" ]]; then
+    DB_PASSWORD="$(cat "$DB_PASSWORD_FILE")"
+    ok "Kata sandi basis data diambil dari ${DB_PASSWORD_FILE}"
+  else
     DB_PASSWORD="$(openssl rand -hex 16)"
-    # APP_DIR biasanya /var/www/... dan belum ada saat VPS masih kosong.
-    if [[ ! -d "$APP_DIR" ]]; then
-      $SUDO mkdir -p "$APP_DIR"
-      $SUDO chown "$(id -u):$(id -g)" "$APP_DIR"
-    fi
     umask 077
     printf '%s\n' "$DB_PASSWORD" > "$DB_PASSWORD_FILE"
     umask 022
     if [[ -n "$SUDO" ]]; then $SUDO chown "$(id -u):$(id -g)" "$DB_PASSWORD_FILE"; fi
     chmod 600 "$DB_PASSWORD_FILE" 2>/dev/null || true
-    log "Membuat peran basis data '$DB_USER' dan database '$DB_NAME'"
-    as_postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 \
-      || as_postgres psql -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD '$DB_PASSWORD'"
-    as_postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1 \
-      || as_postgres createdb -O "${DB_USER}" "${DB_NAME}"
-  else
-    DB_PASSWORD="$(cat "$DB_PASSWORD_FILE")"
-    ok "Peran basis data sudah ada (kata sandi diambil dari .dbpass)"
+    log "Membuat kata sandi basis data baru di ${DB_PASSWORD_FILE}"
   fi
+
+  # Peran & database dipastikan BENAR-BENAR ada. File .dbpass bisa tertinggal
+  # dari run yang gagal di tengah, dan punya sandi tidak berarti perannya jadi.
+  log "Memastikan peran '${DB_USER}' dan database '${DB_NAME}' ada di PostgreSQL"
+  if as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1; then
+    ok "Peran '${DB_USER}' sudah ada"
+  else
+    as_postgres psql -qc "CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}'"
+    ok "Peran '${DB_USER}' dibuat"
+  fi
+  # Selaraskan sandi peran dengan .dbpass (memulihkan keadaan bila pernah beda).
+  as_postgres psql -qc "ALTER ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}'"
+  if as_postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+    ok "Database '${DB_NAME}' sudah ada"
+  else
+    as_postgres createdb -O "${DB_USER}" "${DB_NAME}"
+    ok "Database '${DB_NAME}' dibuat (pemilik: ${DB_USER})"
+  fi
+
+  # Uji koneksi persis seperti aplikasi: TCP + sandi, bukan socket superuser.
+  if ! PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p 5432 -U "${DB_USER}" -d "${DB_NAME}" -tAc "SELECT 1" >/dev/null 2>&1; then
+    die "Koneksi '${DB_USER}' ke ${DB_HOST}:5432/${DB_NAME} ditolak. Periksa pg_hba.conf (metode scram-sha-256) dan listen_addresses PostgreSQL."
+  fi
+  ok "Koneksi '${DB_USER}' ke ${DB_HOST}:5432/${DB_NAME} diterima"
   DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?schema=public&connection_limit=10&connect_timeout=10"
 else
   DATABASE_URL="${DATABASE_URL:-}"

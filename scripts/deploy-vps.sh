@@ -16,6 +16,7 @@
 #   --no-db               jangan pasang PostgreSQL lokal (pakai Supabase/luar)
 #   --reset-db-url        ganti DATABASE_URL di .env dengan basis data lokal
 #   --no-caddy            jangan pasang Caddy (sudah ada nginx sendiri)
+#   --skip-nginx          jangan sentuh nginx walau terpasang (proxy manual)
 #   --skip-build          lewati npm ci + build (hanya restart)
 #   --seed                isi data demo bila database masih kosong
 #   --test                jalankan scripts/smoke-test.mjs setelah deploy
@@ -36,6 +37,7 @@ DB_USER="kolabora"
 DB_HOST="127.0.0.1"
 WITH_DB=1
 WITH_CADDY=1
+SKIP_NGINX=0
 SKIP_BUILD=0
 DO_SEED=0
 RUN_TESTS=0
@@ -59,10 +61,11 @@ while [[ $# -gt 0 ]]; do
     --no-db)      WITH_DB=0; shift ;;
     --reset-db-url) FORCE_DB_URL=1; shift ;;
     --no-caddy)   WITH_CADDY=0; shift ;;
+    --skip-nginx) SKIP_NGINX=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --seed)       DO_SEED=1; shift ;;
     --test)       RUN_TESTS=1; shift ;;
-    -h|--help)    sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help)    sed -n '2,26p' "$0"; exit 0 ;;
     *) die "Argumen tidak dikenal: $1" ;;
   esac
 done
@@ -283,6 +286,13 @@ $SUDO mkdir -p /var/log/kolabora
 $SUDO chown -R "$(id -u):$(id -g)" /var/log/kolabora 2>/dev/null || true
 log "Menjalankan aplikasi dengan PM2"
 APP_PORT="$PORT" pm2 startOrReload ecosystem.config.js --update-env
+# Proses harus ikut hidup lagi setelah server reboot (pm2 save saja tidak cukup).
+if [[ $EUID -eq 0 ]]; then
+  pm2 startup systemd -u "$(id -un)" --hp "$HOME" >/dev/null 2>&1 || warn "pm2 startup gagal — aktifkan autostart manual."
+else
+  $SUDO env PATH="$PATH" pm2 startup systemd -u "$(id -un)" --hp "$HOME" >/dev/null 2>&1 \
+    || warn "Jalankan manual: sudo env PATH=\$PATH pm2 startup systemd -u $(id -un) --hp $HOME"
+fi
 pm2 save
 ok "Proses kolabora status: $(pm2 jlist 2>/dev/null | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const a=JSON.parse(d);const p=a.find(x=>x.name==="kolabora");console.log(p?p.pm2_env.status:"tidak ditemukan")}catch{console.log("?")}})')"
 
@@ -297,6 +307,20 @@ if [[ $WITH_CADDY -eq 1 ]]; then
   $SUDO systemctl enable caddy >/dev/null 2>&1 || true
   $SUDO systemctl reload caddy 2>/dev/null || $SUDO systemctl restart caddy
   ok "Caddy dimuat (HTTPS otomatis saat DNS mengarah ke IP ini)"
+elif command -v nginx >/dev/null 2>&1; then
+  # Server ini sudah memakai nginx di 80/443 (umumnya hosting lebih dari satu
+  # situs) — Caddy tidak bisa dipakai. Serahkan ke naskah nginx yang idempoten.
+  if [[ $SKIP_NGINX -eq 1 ]]; then
+    warn "--skip-nginx: nginx tidak disentuh. Pasang proxy sendiri agar https://${DOMAIN} berfungsi."
+  else
+    log "nginx terdeteksi — menyiapkan situs https://${DOMAIN} → 127.0.0.1:${PORT}"
+    if ! bash scripts/setup-nginx.sh --domain "$DOMAIN" --port "$PORT" --email "$TLS_EMAIL"; then
+      warn "setup-nginx.sh gagal — pasang proxy manual dari deploy/nginx/kolabora.conf"
+    fi
+  fi
+else
+  warn "Tidak ada Caddy dan tidak ada nginx. https://${DOMAIN} belum bisa diakses"
+  warn "sampai ada proxy di depan 127.0.0.1:${PORT}."
 fi
 
 # ---------------------------------------------------------------- firewall
@@ -320,11 +344,24 @@ else
   warn "Endpoint kesehatan belum merespons. Cek: pm2 logs kolabora --lines 50"
 fi
 
+if [[ -n "$HEALTH" ]]; then
+  log "Memeriksa https://${DOMAIN}/api/health (lewat proxy)"
+  PUB=""
+  for i in $(seq 1 5); do
+    if PUB="$(curl -fsS -m 15 "https://${DOMAIN}/api/health" 2>/dev/null)"; then break; fi
+    sleep 3
+  done
+  if [[ -n "$PUB" ]]; then
+    ok "https://${DOMAIN} siap: $(printf '%s' "$PUB" | head -c 140)"
+  else
+    warn "https://${DOMAIN} belum merespons — periksa proxy & DNS: curl -v https://${DOMAIN}/api/health"
+  fi
+fi
+
 if [[ $RUN_TESTS -eq 1 ]]; then
   log "Menjalankan uji end-to-end"
   BASE_URL="https://${DOMAIN}" node scripts/smoke-test.mjs || warn "Sebagian uji gagal — lihat daftar di atas."
 fi
-
 cat <<RINGKASAN
 
 ============================================================================

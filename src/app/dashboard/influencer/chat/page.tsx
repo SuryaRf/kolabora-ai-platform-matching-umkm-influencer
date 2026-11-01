@@ -3,9 +3,16 @@ import { auth } from "@/auth";
 import FeaturePage from "@/components/dashboard/FeaturePage";
 import ChatRoom from "@/components/dashboard/ChatRoom";
 
-export default async function InfluencerChatPage() {
+export default async function InfluencerChatPage({
+  searchParams,
+}: {
+  /** Didapat dari tautan riwayat/notifikasi: /dashboard/influencer/chat?collaboration=<id> */
+  searchParams: Promise<{ collaboration?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) return null;
+
+  const { collaboration } = await searchParams;
 
   return (
     <FeaturePage
@@ -17,6 +24,7 @@ export default async function InfluencerChatPage() {
       <ChatRoom
         role="INFLUENCER"
         meId={session.user.id}
+        initialId={collaboration}
         emptyHint="Chat aktif otomatis setelah Anda menerima tawaran atau lamaran campaign diterima."
       />
     </FeaturePage>

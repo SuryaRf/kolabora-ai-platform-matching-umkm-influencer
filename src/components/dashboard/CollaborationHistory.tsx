@@ -340,6 +340,17 @@ export default function CollaborationHistory({ role }: { role: Role }) {
               peer ?? { name: item.title, email: "" },
             );
             const busy = busyId === item.id;
+            // Escrow relevan di semua tahap setelah dana dikunci, bukan hanya
+            // ESCROW_HELD — sebelumnya banner hilang saat produksi berjalan.
+            const escrowHeld = [
+              "ESCROW_HELD",
+              "IN_PRODUCTION",
+              "CONTENT_SUBMITTED",
+              "UNDER_REVIEW",
+              "REVISION_REQUESTED",
+              "APPROVED",
+            ].includes(item.status);
+            const escrowReleased = item.status === "COMPLETED";
 
             return (
               <div
@@ -408,29 +419,35 @@ export default function CollaborationHistory({ role }: { role: Role }) {
                   <CollaborationProgress role={role} currentIndex={step} />
                 </div>
 
-                {(item.status === "ESCROW_HELD" ||
-                  item.status === "COMPLETED") && (
+                {(escrowHeld || escrowReleased) && (
                   <div className="px-5 pb-4">
                     <div
                       className={`flex items-center gap-2 p-3 rounded-xl text-xs ${
-                        item.status === "COMPLETED"
+                        escrowReleased
                           ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
                           : "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400"
                       }`}
                     >
-                      {item.status === "COMPLETED" ? (
+                      {escrowReleased ? (
                         <Banknote className="w-4 h-4 flex-shrink-0" />
                       ) : (
                         <Lock className="w-4 h-4 flex-shrink-0" />
                       )}
                       <span>
-                        {item.status === "COMPLETED"
+                        {escrowReleased
                           ? `Dana escrow ${formatCurrency(
                               item.escrowAmount ?? item.budget,
-                            )} telah dicairkan.`
-                          : `Dana ${formatCurrency(
-                              item.escrowAmount ?? item.budget,
-                            )} terkunci aman di escrow.`}
+                            )} telah dicairkan ke influencer.`
+                          : item.status === "APPROVED"
+                            ? `Dana ${formatCurrency(
+                                item.escrowAmount ?? item.budget,
+                              )} siap dicairkan ke influencer.`
+                            : `Dana ${formatCurrency(
+                                item.escrowAmount ?? item.budget,
+                              )} terkunci di escrow sampai konten disetujui.`}
+                      </span>
+                      <span className="ml-auto flex-shrink-0 px-1.5 py-0.5 rounded bg-white/60 dark:bg-black/20 text-[10px] font-semibold uppercase tracking-wide">
+                        Simulasi
                       </span>
                     </div>
                   </div>
@@ -450,10 +467,10 @@ export default function CollaborationHistory({ role }: { role: Role }) {
                             href={
                               action.href.to === "chat"
                                 ? role === "UMKM"
-                                  ? "/dashboard/umkm/chat"
-                                  : "/dashboard/influencer/chat"
+                                  ? `/dashboard/umkm/chat?collaboration=${item.id}`
+                                  : `/dashboard/influencer/chat?collaboration=${item.id}`
                                 : role === "UMKM"
-                                  ? "/dashboard/umkm/review-campaign"
+                                  ? `/dashboard/umkm/review-campaign?collaboration=${item.id}`
                                   : "/dashboard/influencer/campaigns"
                             }
                             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"

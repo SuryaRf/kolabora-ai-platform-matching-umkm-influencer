@@ -48,6 +48,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      simulated: true,
       transactionId: `KBR-${crypto.randomBytes(5).toString("hex").toUpperCase()}`,
       amount,
       mode: body.mode ?? "hold",

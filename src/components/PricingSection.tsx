@@ -139,8 +139,7 @@ interface Plan {
   features: { text: string; included: boolean }[];
 }
 
-function PricingCard({ plan, accent, index }: { plan: Plan; accent: "umkm" | "influencer"; index: number }) {
-  const borderColor = accent === "umkm" ? "border-amber-500/50" : "border-rose-500/50";
+function PricingCard({ plan, accent }: { plan: Plan; accent: "umkm" | "influencer" }) {
   const shadowColor = accent === "umkm" ? "shadow-amber-500/10" : "shadow-rose-500/10";
   const hoverBorder = accent === "umkm" ? "hover:border-amber-500/50" : "hover:border-rose-500/50";
   const btnBg = accent === "umkm" ? "bg-amber-500 hover:bg-amber-600" : "bg-influencer hover:bg-influencer-dark";
@@ -225,7 +224,7 @@ export default function PricingSection() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {umkmPlans.map((plan, index) => (
-              <PricingCard key={index} plan={plan} accent="umkm" index={index} />
+              <PricingCard key={index} plan={plan} accent="umkm" />
             ))}
           </div>
         </div>
@@ -237,7 +236,7 @@ export default function PricingSection() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {influencerPlans.map((plan, index) => (
-              <PricingCard key={index} plan={plan} accent="influencer" index={index} />
+              <PricingCard key={index} plan={plan} accent="influencer" />
             ))}
           </div>
         </div>

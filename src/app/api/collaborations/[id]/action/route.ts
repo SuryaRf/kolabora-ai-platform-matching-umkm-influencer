@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notify";
+import { z } from "zod";
 import type { CollaborationStatus, UserRole } from "@prisma/client";
 
 type Transition = {
@@ -57,6 +58,17 @@ const TRANSITIONS: Record<string, Transition> = {
   },
 };
 
+const actionSchema = z.object({
+  action: z.enum([
+    "accept",
+    "agree",
+    "hold_escrow",
+    "start_production",
+    "complete",
+    "cancel",
+  ]),
+});
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -68,11 +80,11 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { action } = (await req.json()) as { action?: string };
-    const transition = action ? TRANSITIONS[action] : undefined;
-    if (!transition) {
+    const parsed = actionSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
       return NextResponse.json({ error: "Aksi tidak dikenal" }, { status: 400 });
     }
+    const transition = TRANSITIONS[parsed.data.action];
 
     const collaboration = await prisma.collaboration.findFirst({
       where: { id, participants: { some: { id: session.user.id } } },
@@ -116,10 +128,20 @@ export async function POST(
       data.completedAt = now;
     }
 
-    const updated = await prisma.collaboration.update({
-      where: { id },
+    // Guard status membuat transisi atomik: dua klik beruntun tidak bisa
+    // menaikkan tahap dua kali / mengirim notifikasi ganda.
+    const result = await prisma.collaboration.updateMany({
+      where: { id, status: collaboration.status },
       data,
     });
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: "Status kolaborasi sudah berubah. Muat ulang halaman." },
+        { status: 409 },
+      );
+    }
+
+    const updated = await prisma.collaboration.findUnique({ where: { id } });
 
     const others = collaboration.participants.filter(
       (p) => p.id !== session.user.id,

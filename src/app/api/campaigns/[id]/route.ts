@@ -36,7 +36,11 @@ export async function GET(
           orderBy: { createdAt: "desc" },
         },
         collaborations: {
-          select: { id: true, status: true },
+          select: {
+            id: true,
+            status: true,
+            participants: { select: { id: true } },
+          },
         },
       },
     });
@@ -49,9 +53,26 @@ export async function GET(
     }
 
     const isOwner = session?.user?.id === campaign.ownerId;
+    // Sertakan collaborationId per lamaran supaya tombol "Chat" langsung
+    // membuka percakapan yang benar, bukan daftar chat secara umum.
+    const applications = isOwner
+      ? campaign.applications.map((app) => {
+          const collab = campaign.collaborations.find(
+            (c) =>
+              c.participants.some((p) => p.id === app.applicantId) &&
+              c.participants.some((p) => p.id === campaign.ownerId),
+          );
+          return { ...app, collaborationId: collab?.id ?? null };
+        })
+      : [];
+
     return NextResponse.json({
       ...campaign,
-      applications: isOwner ? campaign.applications : [],
+      applications,
+      collaborations: campaign.collaborations.map((c) => ({
+        id: c.id,
+        status: c.status,
+      })),
       canManage: isOwner,
     });
   } catch (error) {

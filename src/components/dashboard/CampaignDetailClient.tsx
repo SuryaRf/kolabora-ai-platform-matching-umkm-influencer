@@ -38,6 +38,8 @@ interface Application {
   proposedRate: number | null;
   status: "PENDING" | "REVIEWED" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
   createdAt: string;
+  /** Diisi server bila lamaran ini sudah menjadi kolaborasi. */
+  collaborationId?: string | null;
   applicant: Applicant;
 }
 
@@ -317,7 +319,11 @@ export default function CampaignDetailClient({ id }: { id: string }) {
                       )}
                       {app.status === "ACCEPTED" && (
                         <Link
-                          href="/dashboard/umkm/chat"
+                          href={
+                            app.collaborationId
+                              ? `/dashboard/umkm/chat?collaboration=${app.collaborationId}`
+                              : "/dashboard/umkm/chat"
+                          }
                           className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-kolabora bg-kolabora/10 hover:bg-kolabora/20"
                         >
                           <MessageSquare className="w-3.5 h-3.5" /> Chat

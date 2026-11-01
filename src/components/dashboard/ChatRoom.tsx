@@ -54,7 +54,7 @@ export default function ChatRoom({
   emptyHint,
 }: ChatRoomProps) {
   const [conversations, setConversations] = useState<CollabDTO[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(initialId ?? null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -62,8 +62,23 @@ export default function ChatRoom({
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [targetMissing, setTargetMissing] = useState(false);
   const lastTimestamp = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  /**
+   * Percakapan hanya dipilih otomatis SEKALI. Tanpa penanda ini, polling 15
+   * detik akan memilih ulang percakapan pertama sehingga panel chat yang sudah
+   * ditutup di layar kecil terbuka sendiri lagi.
+   */
+  const picked = useRef(false);
+  /** Deep link terakhir yang sudah diterapkan (untuk navigasi antar-percakapan). */
+  const appliedInitial = useRef<string | null>(null);
+
+  const openConversation = useCallback((id: string) => {
+    picked.current = true;
+    setTargetMissing(false);
+    setActiveId(id);
+  }, []);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -71,11 +86,36 @@ export default function ChatRoom({
       if (!res.ok) return;
       const data: CollabDTO[] = await res.json();
       setConversations(data);
-      setActiveId((current) => current ?? data[0]?.id ?? null);
+
+      // 1) Hormati ?collaboration=<id> bila percakapannya memang ada.
+      //    Dicek sebelum `picked` supaya tautan notifikasi tetap berpindah
+      //    percakapan walau halaman chat sudah terbuka.
+      if (
+        initialId &&
+        initialId !== appliedInitial.current &&
+        data.some((c) => c.id === initialId)
+      ) {
+        appliedInitial.current = initialId;
+        picked.current = true;
+        setTargetMissing(false);
+        setActiveId(initialId);
+        return;
+      }
+
+      if (picked.current) return;
+
+      // 2) Tautan menunjuk percakapan yang tidak ada / bukan milik user.
+      if (initialId) setTargetMissing(true);
+
+      // 3) Jangan pilih apa pun bila belum ada percakapan.
+      if (data[0]) {
+        picked.current = true;
+        setActiveId(data[0].id);
+      }
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [initialId]);
 
   useEffect(() => {
     void loadConversations();
@@ -228,6 +268,15 @@ export default function ChatRoom({
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      {targetMissing && (
+        <div className="flex items-start gap-2 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+          <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>
+            Percakapan yang dituju tidak ditemukan atau bukan milik akun ini.
+            Kami menampilkan percakapan terbaru Anda.
+          </span>
+        </div>
+      )}
       <div className="flex h-[560px]">
         <div
           className={`w-full sm:w-80 border-r border-zinc-200 dark:border-zinc-800 flex-col flex-shrink-0 ${
@@ -258,7 +307,7 @@ export default function ChatRoom({
               return (
                 <button
                   key={conv.id}
-                  onClick={() => setActiveId(conv.id)}
+                  onClick={() => openConversation(conv.id)}
                   className={`w-full flex items-start gap-3 p-3 text-left transition-colors ${
                     conv.id === activeId
                       ? "bg-kolabora/5"

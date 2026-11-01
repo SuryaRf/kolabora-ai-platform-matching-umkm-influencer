@@ -51,7 +51,7 @@ export default function RegisterPage() {
       } else {
         router.push("/login?registered=true");
       }
-    } catch (err) {
+    } catch {
       setError("Terjadi kesalahan");
     } finally {
       setLoading(false);

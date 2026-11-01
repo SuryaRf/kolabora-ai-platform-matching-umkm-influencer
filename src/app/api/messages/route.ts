@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const collaborationId = searchParams.get("collaborationId");
-    const since = searchParams.get("since");
+    const sinceRaw = searchParams.get("since");
 
     if (!collaborationId) {
       return NextResponse.json(
@@ -34,6 +34,12 @@ export async function GET(req: Request) {
         { status: 400 },
       );
     }
+
+    // `since` tidak valid (mis. "abc") jangan sampai membuat request 500 —
+    // perlakukan sebagai permintaan muat-awal.
+    const sinceDate = sinceRaw ? new Date(sinceRaw) : null;
+    const since =
+      sinceDate && !Number.isNaN(sinceDate.getTime()) ? sinceDate : null;
 
     const collab = await assertMember(collaborationId, session.user.id);
     if (!collab) {
@@ -43,10 +49,13 @@ export async function GET(req: Request) {
       );
     }
 
-    const messages = await prisma.message.findMany({
+    // Ambil 200 pesan TERBARU (desc) lalu balikkan ke urutan kronologis.
+    // Sebelumnya `asc + take` membuat chat panjang selalu menampilkan pesan
+    // paling lama dan pesan baru tidak pernah muncul.
+    const rows = await prisma.message.findMany({
       where: {
         collaborationId,
-        ...(since ? { createdAt: { gt: new Date(since) } } : {}),
+        ...(since ? { createdAt: { gte: since } } : {}),
       },
       include: {
         sender: {
@@ -58,18 +67,26 @@ export async function GET(req: Request) {
           },
         },
       },
-      orderBy: { createdAt: "asc" },
-      ...(since ? {} : { take: 200 }),
+      orderBy: { createdAt: "desc" },
+      take: 200,
     });
+    const messages = rows.reverse();
 
-    await prisma.message.updateMany({
-      where: {
-        collaborationId,
-        senderId: { not: session.user.id },
-        read: false,
-      },
-      data: { read: true },
-    });
+    // Tulis hanya bila memang ada pesan belum dibaca — polling 3,5 detik
+    // tidak perlu menulis ke database setiap kali.
+    const hasUnread = messages.some(
+      (m) => m.senderId !== session.user.id && !m.read,
+    );
+    if (hasUnread) {
+      await prisma.message.updateMany({
+        where: {
+          collaborationId,
+          senderId: { not: session.user.id },
+          read: false,
+        },
+        data: { read: true },
+      });
+    }
 
     return NextResponse.json(messages);
   } catch (error) {
@@ -133,8 +150,8 @@ export async function POST(req: Request) {
         "Pesan baru",
         `${session.user.name ?? "Seseorang"}: ${content.slice(0, 80)}`,
         session.user.role === "UMKM"
-          ? "/dashboard/influencer/chat"
-          : "/dashboard/umkm/chat",
+          ? `/dashboard/influencer/chat?collaboration=${collaborationId}`
+          : `/dashboard/umkm/chat?collaboration=${collaborationId}`,
       );
     }
 

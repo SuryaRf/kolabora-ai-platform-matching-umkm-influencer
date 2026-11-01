@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   Clock,
@@ -66,6 +67,9 @@ const STATUS_META: Record<
 };
 
 export default function ReviewCampaignPage() {
+  const searchParams = useSearchParams();
+  /** Dari tautan "Buka Review" di Riwayat Kolaborasi. */
+  const targetCollab = searchParams.get("collaboration");
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"semua" | "pending" | "done">("semua");
@@ -90,15 +94,20 @@ export default function ReviewCampaignPage() {
 
   const pending = reviews.filter((r) => r.status === "PENDING");
 
-  const visible = useMemo(
-    () =>
-      reviews.filter((r) => {
-        if (filter === "pending") return r.status === "PENDING";
-        if (filter === "done") return r.status !== "PENDING";
-        return true;
-      }),
-    [reviews, filter],
-  );
+  const visible = useMemo(() => {
+    const list = reviews.filter((r) => {
+      if (filter === "pending") return r.status === "PENDING";
+      if (filter === "done") return r.status !== "PENDING";
+      return true;
+    });
+    if (!targetCollab) return list;
+    // Konten dari kolaborasi yang dituju tampil paling atas.
+    return [...list].sort(
+      (a, b) =>
+        (a.collaborationId === targetCollab ? 0 : 1) -
+        (b.collaborationId === targetCollab ? 0 : 1),
+    );
+  }, [reviews, filter, targetCollab]);
 
   const review = async (
     reviewId: string,
@@ -225,7 +234,11 @@ export default function ReviewCampaignPage() {
             return (
               <div
                 key={r.id}
-                className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5"
+                className={`bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 ${
+                  targetCollab && r.collaborationId === targetCollab
+                    ? "ring-2 ring-kolabora/40 border-kolabora/40"
+                    : ""
+                }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   <div
@@ -314,7 +327,7 @@ export default function ReviewCampaignPage() {
                         <RotateCcw className="w-3.5 h-3.5" /> Minta Revisi
                       </button>
                       <Link
-                        href="/dashboard/umkm/chat"
+                        href={`/dashboard/umkm/chat?collaboration=${r.collaborationId}`}
                         className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-kolabora bg-kolabora/10 hover:bg-kolabora/20"
                       >
                         <MessageSquare className="w-3.5 h-3.5" /> Diskusi

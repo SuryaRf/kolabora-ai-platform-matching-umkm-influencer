@@ -1,6 +1,5 @@
 import {
   Zap,
-  Users,
   MessageSquare,
   LayoutDashboard,
   BarChart3,

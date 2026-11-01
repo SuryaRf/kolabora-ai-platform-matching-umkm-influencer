@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, CheckCircle2, XCircle, Loader2, ShieldCheck, ArrowRight } from "lucide-react";
+import { Lock, CheckCircle2, XCircle, Loader2, ShieldCheck, ArrowRight, Info } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { formatCurrency } from "@/lib/utils";
 
@@ -95,6 +95,9 @@ export default function PaymentModal({
                 <span className="text-xs font-semibold">
                   Kolabora Secure Escrow
                 </span>
+                <span className="ml-auto px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Simulasi
+                </span>
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex items-center justify-between text-sm">
@@ -120,6 +123,15 @@ export default function PaymentModal({
                   </span>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
+              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p>
+                Mode simulasi: belum ada payment gateway yang terhubung, jadi
+                tidak ada uang sungguhan yang ditarik atau ditransfer. Status
+                escrow hanya dicatat di database untuk keperluan demo.
+              </p>
             </div>
 
             <div className="mt-4 flex items-start gap-2 text-xs text-zinc-500">
@@ -183,6 +195,9 @@ export default function PaymentModal({
                 <span className="font-semibold">{formatCurrency(amount)}</span>
               </div>
             </div>
+            <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+              Transaksi simulasi — tidak ada dana nyata yang berpindah.
+            </p>
             <button
               onClick={finish}
               className="mt-5 w-full py-3 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-all"

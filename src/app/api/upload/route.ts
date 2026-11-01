@@ -21,6 +21,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Beri tahu penyebabnya, bukan "Upload failed" tanpa konteks: tanpa token
+    // Blob, unggah memang tidak bisa jalan di lingkungan ini.
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return NextResponse.json(
+        {
+          error:
+            "Penyimpanan berkas belum diaktifkan (BLOB_READ_WRITE_TOKEN kosong). Pakai kolom tempel URL/tautan gambar sebagai gantinya.",
+        },
+        { status: 503 },
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -57,6 +69,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.error("Upload error:", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          "Upload gagal — token Blob ditolak atau koneksi ke penyimpanan bermasalah. Coba tempel URL gambar saja.",
+      },
+      { status: 500 },
+    );
   }
 }

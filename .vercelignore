@@ -1,0 +1,20 @@
+# ============================================================================
+# File yang TIDAK boleh ikut ter-upload saat `vercel deploy` (CLI).
+# Polanya sama seperti .gitignore.
+#
+# Tanpa file ini, `vercel --prod` ikut mengirim .env (berisi DEEPSEEK_API_KEY
+# dan BLOB_READ_WRITE_TOKEN) ke deployment, lalu Next.js membacanya sebagai
+# fallback. Nilai rahasia harus lewat `vercel env add`, bukan lewat berkas.
+# ============================================================================
+
+.env*
+!.env.example
+!.env.production.example
+
+# rahasia & cadangan lokal
+.dbpass
+backups/
+*.pem
+
+# sampah sistem
+.DS_Store

@@ -75,6 +75,19 @@ if [[ -z "$TLS_EMAIL" ]]; then TLS_EMAIL="admin@${DOMAIN}"; fi
 if [[ $EUID -eq 0 ]]; then SUDO=""; elif command -v sudo >/dev/null 2>&1; then SUDO="sudo"; else die "Perlu root atau sudo."; fi
 $SUDO true
 
+# Menjalankan perintah sebagai sistem user 'postgres'. Dipakai lewat root
+# (tanpa paket sudo) maupun user biasa: `$SUDO -u postgres` akan runtuh jadi
+# `-u postgres ...` bila SUDO kosong, jadi pengalihnya dibuat di sini.
+as_postgres() {
+  if [[ -n "$SUDO" ]]; then
+    $SUDO -u postgres "$@"
+  elif command -v runuser >/dev/null 2>&1; then
+    runuser -u postgres -- "$@"
+  else
+    su -s /bin/sh postgres -c "$(printf '%q ' "$@")"
+  fi
+}
+
 log "Sistem: $(. /etc/os-release && echo "$PRETTY_NAME") | domain: $DOMAIN | direktori: $APP_DIR"
 
 command -v apt-get >/dev/null 2>&1 || die "Naskah ini untuk Ubuntu/Debian (apt-get tidak ditemukan)."
@@ -135,10 +148,10 @@ if [[ $WITH_DB -eq 1 ]]; then
     if [[ -n "$SUDO" ]]; then $SUDO chown "$(id -u):$(id -g)" "$DB_PASSWORD_FILE"; fi
     chmod 600 "$DB_PASSWORD_FILE" 2>/dev/null || true
     log "Membuat peran basis data '$DB_USER' dan database '$DB_NAME'"
-    $SUDO -u postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 \
-      || $SUDO -u postgres psql -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD '$DB_PASSWORD'"
-    $SUDO -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1 \
-      || $SUDO -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+    as_postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 \
+      || as_postgres psql -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD '$DB_PASSWORD'"
+    as_postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1 \
+      || as_postgres createdb -O "${DB_USER}" "${DB_NAME}"
   else
     DB_PASSWORD="$(cat "$DB_PASSWORD_FILE")"
     ok "Peran basis data sudah ada (kata sandi diambil dari .dbpass)"

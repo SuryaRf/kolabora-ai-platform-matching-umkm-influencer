@@ -47,7 +47,7 @@
 - **Error Handling** - ✅ fallback aturan + pesan terbaca di UI
 - **Testing** - ✅ `scripts/smoke-test.mjs` (81 pemeriksaan end-to-end) + `scripts/test-env-block.sh` (16) + `scripts/test-set-key.sh` (27)
 - **Environment Config** - ✅ `.env.example` (dev) dan `.env.production.example` (VPS)
-- **Deployment Ready** - ✅ naskah VPS + PM2 + Caddy, dan tetap bisa ke Vercel
+- **Deployment Ready** - ✅ VPS `kolabora.tech` aktif (nginx + PM2 + PostgreSQL lokal + Let's Encrypt), jalur Vercel tetap tersedia
 
 ---
 
@@ -142,13 +142,15 @@ Aplikasi harus bisa digunakan secara real dengan fitur:
 | Uji end-to-end seluruh alur | ✅ Done | P0 | `scripts/smoke-test.mjs` — **81/81 lulus** (login→campaign→lamar→escrow→review→selesai) |
 | Uji naskah deploy | ✅ Done | P0 | `scripts/test-env-block.sh` — 16/16 lulus (`npm run test:deploy`); `scripts/test-set-key.sh` — 27/27 lulus (`npm run test:keys`) |
 | Skema & data demo sebagai SQL | ✅ Done | P0 | `supabase/migrations/0001_init.sql`, `0002_seed_demo.sql` (idempoten, sudah diverifikasi ulang) |
-| Naskah pasang/perbarui VPS | ✅ Done | P0 | `scripts/deploy-vps.sh` — Node 22, Postgres, PM2, Caddy, firewall, uji `.env` aman |
-| Konfigurasi PM2 + Caddy | ✅ Done | P0 | `ecosystem.config.js`, `deploy/Caddyfile` (HTTPS, header, body 10 MB) |
+| Naskah pasang/perbarui VPS | ✅ Done | P0 | `scripts/deploy-vps.sh` — Node 22, Postgres (peran+DB+hak CREATEDB), PM2 + `pm2 startup`, proxy, firewall, uji `.env` aman; jalan sebagai root maupun user sudo |
+| Konfigurasi PM2 + proxy | ✅ Done | P0 | `ecosystem.config.js` (listen 127.0.0.1 saja), `deploy/Caddyfile`, dan `deploy/nginx/kolabora.conf` + `scripts/setup-nginx.sh` untuk server yang sudah punya nginx (certbot `--nginx`, cadangan & rollback otomatis) |
 | Pencadangan basis data | ✅ Done | P0 | `scripts/backup-db.sh` — pemulihan `.dump` dan `.sql` sudah diverifikasi sungguhan |
 | Panduan deploy berbahasa Indonesia | ✅ Done | P0 | `docs/DEPLOY-VPS.md` (DNS, AI, update, rollback, backup, alternatif Vercel) |
 | Menempelkan `DEEPSEEK_API_KEY` | ✅ Done | P0 | `npm run set-key` (input tersembunyi, izin 0600) — kunci asli terisi 35 karakter, tidak pernah tampil di log/chat |
 | Verifikasi AI asli end-to-end | ✅ Done | P0 | `/api/ai/status?test=1` → `ok:true` (770 ms); `smoke` 81/81 dengan `aiUsed=true` di match/score-campaign/optimize-profile/rate-card; skor brief hibrida stabil (aturan 78 → hibrida 74; brief ringkas aturan 52 → hibrida 46) |
-| Menjalankan deploy di VPS `kolabora.tech` | ⏳ To Do | P0 | butuh IP/akses SSH — `bash scripts/deploy-vps.sh --domain kolabora.tech --seed --test` |
+| Menjalankan deploy di VPS `kolabora.tech` | ✅ Done | P0 | 1 Nov: Ubuntu 24.04 + nginx (sudah dipakai 2 situs lain) → `--no-caddy --port 3050`; PostgreSQL lokal, PM2 + `pm2 startup`, certbot `--nginx`; `smoke` **81/81 lulus** di produksi, unggah gambar via Vercel Blob lulus, data lama dipindah dari Supabase (7 user/3 campaign/2 kolaborasi) |
+| Bug nyata yang ketemu saat deploy VPS | ✅ Done | P0 | (a) `deploy-vps.sh` mati saat login root: `$SUDO -u postgres` runtuh jadi `-u postgres` → pengalih `as_postgres()`; (b) `.dbpass` sisa run gagal membuat `CREATE ROLE` dilewati → `prisma db push` P1000, kini peran/DB selalu dipastikan ada + uji koneksi TCP; (c) tanpa hak `CREATEDB` `prisma db push` menggantung tanpa galat → diberi CREATEDB + `timeout 600`; (d) `next start` ternyata listen `0.0.0.0` → `--hostname 127.0.0.1` |
+| Rotasi `DEEPSEEK_API_KEY` | ⏳ To Do | P0 | kunci lama pernah ikut ter-upload ke Vercel lewat `.env` (sebelum `.vercelignore` ada) — ganti di platform.deepseek.com lalu `bash scripts/set-key.sh` di VPS & `vercel env add` |
 | Rating & review timbal balik (lihat Phase 3) | ⏳ To Do | P1 | setelah kolaborasi COMPLETED |
 | Notifikasi email | ⏳ To Do | P1 | butuh layanan SMTP |
 | Payment gateway sungguhan (Midtrans/Xendit) | ⏳ To Do | P2 | sengaja masih simulasi |

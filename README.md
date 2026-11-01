@@ -10,7 +10,7 @@ Dua jalur deploy didukung:
 
 | Jalur | Cocok untuk | Dibaca di |
 |---|---|---|
-| **VPS + Caddy + PM2** (utama, domain `kolabora.tech`) | kontrol penuh, database lokal, tanpa batas gratis | [`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md) |
+| **VPS + nginx (atau Caddy) + PM2** — aktif di `https://kolabora.tech` | kontrol penuh, database lokal, tanpa batas gratis | [`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md) |
 | Vercel + Supabase | demo cepat, nol administrasi server | bagian 6 |
 
 ---
@@ -171,19 +171,32 @@ curl -s https://kolabora.tech/api/health      # database, versi, status AI
 
 ## 5. Deploy ke VPS (kolabora.tech)
 
+Server produksi sudah berjalan di **<https://kolabora.tech>** — Ubuntu 24.04,
+nginx di 80/443 (dipakai juga oleh situs lain di mesin yang sama), PostgreSQL 16
+lokal, Next.js di PM2 pada port internal `3050`, sertifikat Let's Encrypt.
+
 ```bash
-ssh user@IP_VPS
-git clone https://github.com/<user>/<repo>.git /var/www/kolabora && cd /var/www/kolabora
-bash scripts/deploy-vps.sh --domain kolabora.tech
+ssh root@IP_VPS
+git clone https://github.com/SuryaRf/kolabora-ai-platform-matching-umkm-influencer.git /var/www/kolabora
+cd /var/www/kolabora
+bash scripts/deploy-vps.sh --domain kolabora.tech --email admin@kolabora.tech --no-caddy --port 3050
 ```
 
-Naskah tersebut memasang Node 22, Caddy (HTTPS otomatis Let's Encrypt), PostgreSQL
-lokal, menjalankan build produksi di PM2, membuka firewall, lalu memeriksa
-`/api/health`. Idempoten — jalankan lagi setiap kali ingin memperbarui.
-Detail, flag, pencadangan, dan pemulihan ada di **[`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md)**.
+`--no-caddy` berarti web server yang sudah ada (nginx) tidak diganggu; naskah
+melanjutkan ke `scripts/setup-nginx.sh` untuk menulis situs, memuat ulang nginx,
+dan meminta sertifikat lewat `certbot --nginx`. Kalau servernya masih kosong,
+buang flag itu dan Caddy yang dipasang.
 
-Perkakas yang dipakai: `ecosystem.config.js` (PM2), `deploy/Caddyfile` (reverse proxy),
-`scripts/backup-db.sh` (cadangan Postgres).
+Naskah tersebut memasang Node 22, PostgreSQL lokal (peran + basis data + hak
+`CREATEDB` untuk Prisma), menjalankan build produksi di PM2 (termasuk
+`pm2 startup` agar ikut hidup setelah reboot), membuka firewall, lalu memeriksa
+`/api/health` secara langsung maupun lewat HTTPS. Idempoten — jalankan lagi
+setiap kali ingin memperbarui. Detail, flag, pemindahan data dari Supabase,
+pencadangan, dan pemulihan ada di **[`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md)**.
+
+Perkakas yang dipakai: `ecosystem.config.js` (PM2, hanya listen `127.0.0.1`),
+`deploy/nginx/kolabora.conf` + `scripts/setup-nginx.sh` (proxy & TLS),
+`deploy/Caddyfile` (alternatif tanpa nginx), `scripts/backup-db.sh` (cadangan Postgres).
 
 ---
 

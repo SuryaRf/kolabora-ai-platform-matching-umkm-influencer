@@ -280,8 +280,12 @@ else
 fi
 ok "Basis data yang akan dipakai aplikasi: ${DB_IN_USE:-BELUM ADA}"
 if [[ $WITH_DB -eq 1 && $DB_URL_CHANGED -eq 0 ]]; then
-  warn "DATABASE_URL di .env sudah terisi, jadi basis data lokal '$DB_NAME' tidak dipakai."
-  warn "Untuk memaksa pakai PostgreSQL lokal: bash scripts/deploy-vps.sh --reset-db-url"
+  if [[ "$DB_VALUE" == *"@${DB_HOST}:5432/${DB_NAME}"* ]]; then
+    ok "DATABASE_URL di .env sudah menunjuk ke basis data lokal '${DB_NAME}'."
+  else
+    warn "DATABASE_URL di .env menunjuk ke database lain — basis data lokal '$DB_NAME' tidak dipakai."
+    warn "Untuk memaksa pakai PostgreSQL lokal: bash scripts/deploy-vps.sh --reset-db-url"
+  fi
 fi
 if is_placeholder "$(env_value AUTH_SECRET)"; then
   log "Menghasilkan AUTH_SECRET baru"

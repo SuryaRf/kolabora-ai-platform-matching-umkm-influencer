@@ -325,6 +325,81 @@ async function main() {
     `feedback=${JSON.stringify(row2?.feedback ?? null)}`,
   );
 
+  // ---- KUNCI DUPLIKASI: satu pekerjaan = satu kartu ----
+  // Audit menemukan brand bisa membuat kolaborasi kembar lewat jalur undangan
+  // (jalur unggulan dan halaman Highlights), padahal jalur terima-lamaran menguncinya.
+  const twinTitle = `SMOKE KEMBAR ${new Date().toISOString().slice(11, 19)}`;
+  const invite = (title, campaignId) =>
+    umkm.request("/api/collaborations", {
+      method: "POST",
+      body: {
+        participantId: kol.user.id,
+        title,
+        brief: "Uji otomatis: kunci duplikasi kolaborasi.",
+        budget: 700000,
+        ...(campaignId ? { campaignId } : {}),
+      },
+    });
+  const firstInvite = await invite(twinTitle);
+  check(
+    "undangan pertama dibuat",
+    firstInvite.status === 201 && Boolean(firstInvite.json?.id),
+    `status=${firstInvite.status}`,
+  );
+  const twin = await invite(`${twinTitle}`);
+  check(
+    "undangan kembar (judul sama) ditolak dengan 409 + menunjuk yang lama",
+    twin.status === 409 && Boolean(twin.json?.existingId),
+    `status=${twin.status} pesan=${String(twin.json?.error).slice(0, 40)}`,
+  );
+  const secondProject = await invite(`${twinTitle} — proyek lain`);
+  check(
+    "proyek berbeda (judul beda) dari pasangan yang sama tetap boleh",
+    secondProject.status === 201,
+    `status=${secondProject.status}`,
+  );
+  await umkm.request(`/api/collaborations/${firstInvite.json?.id}/action`, {
+    method: "POST",
+    body: { action: "cancel" },
+  });
+  const afterCancel = await invite(twinTitle);
+  check(
+    "kolaborasi yang sudah batal tidak menghalangi lagi",
+    afterCancel.status === 201,
+    `status=${afterCancel.status}`,
+  );
+  const campaignInvite = await invite(
+    `SMOKE CAMPAIGN A ${twinTitle}`,
+    campReject.json?.id,
+  );
+  check(
+    "undangan menempel ke campaign",
+    campaignInvite.status === 201,
+    `status=${campaignInvite.status}`,
+  );
+  const campaignTwin = await invite(
+    `SMOKE CAMPAIGN B ${twinTitle}`,
+    campReject.json?.id,
+  );
+  check(
+    "satu campaign tidak boleh punya dua kolaborasi terbuka untuk pelamar sama",
+    campaignTwin.status === 409,
+    `status=${campaignTwin.status}`,
+  );
+  // bereskan supaya naskah bisa dijalankan berulang
+  for (const id of [
+    secondProject.json?.id,
+    afterCancel.json?.id,
+    campaignInvite.json?.id,
+  ]) {
+    if (id) {
+      await umkm.request(`/api/collaborations/${id}/action`, {
+        method: "POST",
+        body: { action: "cancel" },
+      });
+    }
+  }
+
   const asRole = (role) => (role === "UMKM" ? umkm : kol);
   const act = (role, action, extra) =>
     asRole(role).request(`/api/collaborations/${collabId}/action`, {
@@ -817,7 +892,10 @@ async function main() {
         brief:
           "Uji otomatis: mengajak kreator berkolaborasi dari daftar unggulan.",
         budget: ownActive?.budgetMin ?? 500000,
-        campaignId: ownActive?.id ?? null,
+        // Campaign uji sendiri: campaign pertama milik brand bisa jadi sudah punya
+        // kolaborasi terbuka dengan kreator yang sama, dan kunci anti-duplikasi
+        // akan (dengan benar) menolak uji ini.
+        campaignId: created.json?.id ?? ownActive?.id ?? null,
       },
     });
     const inviteId = invite.json?.id;
@@ -859,10 +937,12 @@ async function main() {
       method: "POST",
       body: {
         participantId: kol.user.id,
-        title: "SMOKE Uji terima tawaran",
+        // Judul unik + tanpa campaign: kalau menempel ke campaign yang sudah
+        // punya kolaborasi terbuka dengan kol, kunci anti-duplikasi menolak.
+        title: `SMOKE Uji terima tawaran ${new Date().toISOString().slice(11, 19)}`,
         brief: "Uji otomatis: menerima tawaran brand lewat aksi accept.",
         budget: ownActive?.budgetMin ?? 500000,
-        campaignId: ownActive?.id ?? null,
+        campaignId: null,
       },
     });
     const offerId = offer.json?.id;

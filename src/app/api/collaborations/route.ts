@@ -78,6 +78,39 @@ export async function POST(req: Request) {
       }
     }
 
+    // Satu pekerjaan = satu kartu. Tanpa kunci ini brand bisa tanpa sadar
+    // membuat kolaborasi kembar (dua kali klik "Ajukan Kolaborasi" dari halaman
+    // unggulan), dan Riwayat Kolaborasi menampilkan dua kartu identik yang
+    // tahapannya berjalan sendiri-sendiri.
+    //   - kalau lamaran/undangan menempel ke campaign: cukup satu kolaborasi
+    //     yang masih terbuka untuk pasangan brand+kreator di campaign itu;
+    //   - kalau tanpa campaign (jalur undangan bebas): yang dikunci judul yang
+    //     sama, supaya dua proyek berbeda dari orang yang sama tetap boleh.
+    const twin = await prisma.collaboration.findFirst({
+      where: {
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+        AND: [
+          { participants: { some: { id: session.user.id } } },
+          { participants: { some: { id: participantId } } },
+          campaignId
+            ? { campaignId }
+            : { title: { equals: title, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, title: true, status: true },
+    });
+    if (twin) {
+      return NextResponse.json(
+        {
+          error: campaignId
+            ? `Kolaborasi untuk campaign ini dengan ${influencer.name} masih berjalan (“${twin.title}”). Selesaikan atau batalkan dulu sebelum membuat yang baru.`
+            : `Sudah ada kolaborasi terbuka berjudul “${twin.title}” dengan ${influencer.name}. Pakai judul lain kalau ini proyek yang berbeda.`,
+          existingId: twin.id,
+        },
+        { status: 409 },
+      );
+    }
+
     const collaboration = await prisma.collaboration.create({
       data: {
         campaignId: campaignId ?? undefined,

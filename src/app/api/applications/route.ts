@@ -151,17 +151,24 @@ export async function PATCH(req: Request) {
     const existing = await prisma.collaboration.findFirst({
       where: {
         campaignId: application.campaignId,
+        // Hanya kolaborasi yang masih terbuka yang menghalangi: yang sudah
+        // selesai/batal adalah sejarah, bukan pekerjaan berjalan.
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
         AND: [
           { participants: { some: { id: session.user.id } } },
           { participants: { some: { id: application.applicantId } } },
         ],
       },
+      select: { id: true, title: true, status: true },
     });
 
     if (existing) {
       return NextResponse.json(
-        { error: "Kolaborasi untuk pelamar ini sudah dibuat" },
-        { status: 400 },
+        {
+          error: `Kolaborasi untuk pelamar ini sudah berjalan (“${existing.title}”). Selesaikan atau batalkan dulu.`,
+          existingId: existing.id,
+        },
+        { status: 409 },
       );
     }
 

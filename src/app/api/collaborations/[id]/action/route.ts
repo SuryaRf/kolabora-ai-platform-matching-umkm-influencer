@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notify";
+import { formatCurrency } from "@/lib/utils";
 import { z } from "zod";
 import type { CollaborationStatus, UserRole } from "@prisma/client";
 
@@ -21,13 +22,9 @@ const TRANSITIONS: Record<string, Transition> = {
     label: (title) => `Tawaran kolaborasi "${title}" diterima.`,
     notifyTitle: "Tawaran diterima",
   },
-  agree: {
-    from: ["NEGOTIATION"],
-    to: "AGREED",
-    role: "ANY",
-    label: (title) => `Deal kolaborasi "${title}" disepakati.`,
-    notifyTitle: "Deal disepakati",
-  },
+  // NEGOTIATION -> AGREED sengaja TIDAK ada di tabel ini.
+  // Deal membutuhkan konfirmasi KEDUA belah pihak, jadi satu klik tidak boleh
+  // memutasikan status. Penanganannya ada di confirmDeal() di bawah.
   hold_escrow: {
     from: ["AGREED"],
     to: "ESCROW_HELD",
@@ -61,12 +58,16 @@ const TRANSITIONS: Record<string, Transition> = {
 const actionSchema = z.object({
   action: z.enum([
     "accept",
-    "agree",
+    "confirm_deal",
     "hold_escrow",
     "start_production",
     "complete",
     "cancel",
   ]),
+  /** Tarif final hasil negosiasi. Beda dari budget saat ini = penawaran ulang. */
+  budget: z.coerce.number().int().min(1).max(2_000_000_000).optional(),
+  /** Catatan singkat kesepakatan (deliverables/tenggat), maks 500 karakter. */
+  note: z.string().trim().max(500).optional(),
 });
 
 export async function POST(
@@ -82,9 +83,19 @@ export async function POST(
 
     const parsed = actionSchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
-      return NextResponse.json({ error: "Aksi tidak dikenal" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Aksi tidak dikenal" },
+        { status: 400 },
+      );
     }
     const transition = TRANSITIONS[parsed.data.action];
+
+    if (parsed.data.action === "confirm_deal") {
+      return confirmDeal(id, session.user.id, session.user.role, {
+        budget: parsed.data.budget,
+        note: parsed.data.note,
+      });
+    }
 
     const collaboration = await prisma.collaboration.findFirst({
       where: { id, participants: { some: { id: session.user.id } } },
@@ -165,4 +176,138 @@ export async function POST(
     console.error("Collaboration action error:", error);
     return NextResponse.json({ error: "Terjadi kesalahan" }, { status: 500 });
   }
+}
+
+/**
+ * NEGOTIATION -> AGREED dengan konfirmasi DUA BELAH PIHAK.
+ *
+ * - Klik pertama hanya mencatat konfirmasi; status tetap NEGOTIATION.
+ * - Tarif yang dikirim berbeda dari budget saat ini => penawaran ulang: budget
+ *   diganti dan SEMUA konfirmasi direset, jadi kedua pihak harus klik lagi.
+ * - Status baru menjadi AGREED setelah semua peserta mengonfirmasi tarif yang
+ *   sama. Angka tarif ditulis ke `budget` (+ snapshot `dealAmount`), sehingga
+ *   escrow berikutnya mengunci hasil negosiasi, bukan angka awal lamaran.
+ * - Update dijaga `status = 'NEGOTIATION'` di dalam updateMany: dua klik
+ *   bersamaan tidak bisa menutup deal dua kali / bangunkan escrow ganda.
+ * - Setiap kejadian dicatat sebagai pesan SYSTEM di chat kolaborasi, supaya
+ *   riwayat deal terlihat di sisi kedua pihak.
+ */
+async function confirmDeal(
+  id: string,
+  meId: string,
+  myRole: UserRole,
+  input: { budget?: number; note?: string },
+) {
+  const collab = await prisma.collaboration.findFirst({
+    where: { id, participants: { some: { id: meId } } },
+    include: {
+      participants: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  if (!collab) {
+    return NextResponse.json(
+      { error: "Kolaborasi tidak ditemukan" },
+      { status: 404 },
+    );
+  }
+  if (collab.status !== "NEGOTIATION") {
+    return NextResponse.json(
+      { error: "Deal hanya bisa dikonfirmasi pada tahap negosiasi" },
+      { status: 400 },
+    );
+  }
+
+  const nextBudget = input.budget ?? collab.budget;
+  const now = new Date();
+
+  const outcome = await prisma.$transaction(async (tx) => {
+    const fresh = await tx.collaboration.findUnique({
+      where: { id },
+      include: { participants: { select: { id: true } } },
+    });
+    if (!fresh || fresh.status !== "NEGOTIATION") return null;
+
+    const counterOffer = nextBudget !== fresh.budget;
+    const carried = counterOffer ? [] : (fresh.dealConfirmedBy ?? []);
+    const confirmedBy = Array.from(new Set([...carried, meId]));
+    const closed =
+      fresh.participants.length > 0 &&
+      fresh.participants.every((p) => confirmedBy.includes(p.id));
+
+    const guard = await tx.collaboration.updateMany({
+      where: { id, status: "NEGOTIATION" },
+      data: {
+        budget: nextBudget,
+        dealConfirmedBy: confirmedBy,
+        ...(input.note !== undefined ? { agreedNote: input.note } : {}),
+        ...(closed
+          ? {
+              status: "AGREED" as const,
+              agreedAt: now,
+              dealAmount: nextBudget,
+            }
+          : {}),
+      },
+    });
+    if (guard.count === 0) return null;
+
+    return { closed, counterOffer, confirmedBy };
+  });
+
+  if (!outcome) {
+    return NextResponse.json(
+      { error: "Status kolaborasi sudah berubah. Muat ulang halaman." },
+      { status: 409 },
+    );
+  }
+
+  const me = collab.participants.find((p) => p.id === meId);
+  const myName = me?.name || me?.email || "Salah satu pihak";
+  const peers = collab.participants.filter((p) => p.id !== meId);
+  const peerNames =
+    peers
+      .map((p) => p.name || p.email)
+      .filter(Boolean)
+      .join(" & ") || "pihak lain";
+  const rate = formatCurrency(nextBudget);
+
+  const dealMessage = outcome.closed
+    ? `Deal final ${rate}${input.note ? ` — ${input.note}` : ""} dikonfirmasi kedua belah pihak. Berikutnya: brand mengunci dana escrow, lalu kreator memulai produksi.`
+    : outcome.counterOffer
+      ? `${myName} menawarkan tarif ${rate}. Konfirmasi deal direset — Anda dan ${peerNames} perlu menekan "Konfirmasi Deal" lagi pada tarif yang sama.`
+      : `${myName} sudah mengonfirmasi deal ${rate}. Deal terkunci setelah ${peerNames} ikut mengonfirmasi.`;
+
+  await prisma.message.create({
+    data: {
+      collaborationId: id,
+      senderId: meId,
+      content: dealMessage,
+      type: "SYSTEM",
+    },
+  });
+
+  const historyTarget =
+    myRole === "UMKM"
+      ? "/dashboard/influencer/history"
+      : "/dashboard/umkm/history";
+  const notifyTitle = outcome.closed
+    ? "Deal disepakati"
+    : outcome.counterOffer
+      ? "Penawaran tarif baru"
+      : "Menunggu konfirmasi Anda";
+  const notifyBody = outcome.closed
+    ? `Deal "${collab.title}" final di ${rate}. Brand bisa mengunci escrow.`
+    : outcome.counterOffer
+      ? `${myName} menawarkan tarif ${rate} untuk "${collab.title}".`
+      : `${myName} mengonfirmasi deal ${rate} untuk "${collab.title}". Klik Konfirmasi Deal untuk mengunci.`;
+
+  await Promise.all(
+    peers.map((p) =>
+      notify(p.id, "COLLABORATION", notifyTitle, notifyBody, historyTarget),
+    ),
+  );
+
+  const updated = await prisma.collaboration.findUnique({ where: { id } });
+  return NextResponse.json({ ...(updated ?? {}), dealMessage });
 }

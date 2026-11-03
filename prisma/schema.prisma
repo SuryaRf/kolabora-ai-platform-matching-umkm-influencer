@@ -228,6 +228,13 @@ model Collaboration {
   budget      Int
   status      CollaborationStatus @default(PROPOSED)
   
+  // Kesepakatan final hasil negosiasi.
+  // Deal baru menjadi AGREED setelah SEMUA peserta klik konfirmasi.
+  // Mengubah tarif = penawaran ulang (budget diganti, dealConfirmedBy direset).
+  dealConfirmedBy String[]         @default([])
+  dealAmount      Int?             // snapshot budget pada saat AGREED
+  agreedNote      String? @db.Text // catatan singkat deliverables/kesepakatan
+
   // Escrow mock
   escrowAmount Int?
   escrowStatus String?            // HELD, RELEASED, REFUNDED

@@ -79,6 +79,9 @@ export async function getCollaborationsForUser(
       status: c.status,
       escrowStatus: c.escrowStatus,
       escrowAmount: c.escrowAmount,
+      dealConfirmedBy: c.dealConfirmedBy ?? [],
+      dealAmount: c.dealAmount,
+      agreedNote: c.agreedNote,
       campaign: c.campaign,
       participants: c.participants.map((p) =>
         serializeParticipant(p as unknown as ParticipantRow),

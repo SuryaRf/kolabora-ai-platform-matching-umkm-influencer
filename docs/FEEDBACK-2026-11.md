@@ -506,6 +506,15 @@ Baris demo di kedua basis data kini: `createdAt 2026-10-18 05:59` ≤ `agreedAt 
 `escrowHeldAt 10-20` ≤ `startedAt 10-21`, `dealAmount = escrowAmount = 1.500.000`,
 2 konfirmasi, 2 pesan `SYSTEM`, dan lamaran Rizky Foodie `ACCEPTED`.
 
+Pembacaan ulang lewat **endpoint asli** (`/tmp/prod-readcheck-r4.mjs`, hanya GET) di
+`kolabora.tech` **dan** fallback Vercel, masing-masing **11/11**: kartu demo menunjuk
+`dealAmount = budget = 1.500.000`, `dealConfirmedBy` dua id, `escrowStatus=HELD` dengan
+nominal sama, urut waktu `createdAt <= agreedAt <= startedAt`, dua pesan SYSTEM muncul di
+chat, lamaran pendahulunya terbaca `ACCEPTED`, dan tiga halaman (Lamaran kreator, dashboard
+brand, analitik kreator) tetap 200. Tiga FAIL pada run pertama adalah bug di naskah ceknya
+sendiri: ia membaca `/api/collaborations/<id>` yang memang tidak ada (400/404) dan
+`escrowHeldAt` yang tidak diekspos DTO — bukan bug aplikasi.
+
 Baris tester **tidak berubah**: `cmvxnqfch000nbzgcnbd5tjw0` tetap `NEGOTIATION`,
 `dealConfirmedBy = {}`, 6 pesan; `cmw0npaoq001tbzw7vx6ky0yb` tetap `NEGOTIATION`,
 `dealConfirmedBy = {}`, 1 pesan. Keduanya masih menunggu kedua sisi menekan

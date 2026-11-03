@@ -21,6 +21,9 @@ export default function Footer() {
           <div>
             <h3 className="text-sm font-semibold text-white mb-4">Platform</h3>
             <ul className="space-y-2">
+              {/* Tidak ada tautan "Dashboard" di sini: /dashboard hanya
+                  mengarahkan ke /login bagi pengunjung tanpa sesi, jadi
+                  tautannya redundan dengan "Masuk" di kolom Akun. */}
               <li>
                 <Link
                   href="/"
@@ -43,14 +46,6 @@ export default function Footer() {
                   className="text-sm hover:text-white transition-colors"
                 >
                   Harga
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard"
-                  className="text-sm hover:text-white transition-colors"
-                >
-                  Dashboard
                 </Link>
               </li>
             </ul>

@@ -37,12 +37,6 @@ export default function Navbar() {
               Harga
             </Link>
             <Link
-              href="/dashboard"
-              className="text-sm font-medium text-zinc-600 hover:text-kolabora transition-colors"
-            >
-              Dashboard
-            </Link>
-            <Link
               href="/login"
               className="text-sm font-medium text-zinc-600 hover:text-kolabora transition-colors"
             >
@@ -92,13 +86,6 @@ export default function Navbar() {
               onClick={() => setOpen(false)}
             >
               Harga
-            </Link>
-            <Link
-              href="/dashboard"
-              className="block text-sm font-medium text-zinc-600 hover:text-kolabora transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              Dashboard
             </Link>
             <Link
               href="/login"

@@ -47,6 +47,18 @@ function dayOf(iso: string) {
   });
 }
 
+/**
+ * Satu ruang chat = satu kolaborasi = satu campaign (Message hanya punya
+ * collaborationId). Kalau satu kreator masuk ke dua campaign milik brand yang
+ * sama, namanya muncul dua kali di daftar, jadi judul campaign selalu diberi
+ * awalan "Campaign:" supaya kedua ruang jelas dibedakan.
+ */
+function conversationLabel(c: CollabDTO) {
+  return c.campaign?.title
+    ? `Campaign: ${c.campaign.title}`
+    : `Kolaborasi: ${c.title}`;
+}
+
 export default function ChatRoom({
   role,
   meId,
@@ -231,7 +243,8 @@ export default function ChatRoom({
         .join(" ") ?? "";
     return (
       name.toLowerCase().includes(search.toLowerCase()) ||
-      c.title.toLowerCase().includes(search.toLowerCase())
+      c.title.toLowerCase().includes(search.toLowerCase()) ||
+      (c.campaign?.title ?? "").toLowerCase().includes(search.toLowerCase())
     );
   });
 
@@ -329,7 +342,7 @@ export default function ChatRoom({
                       </span>
                     </div>
                     <p className="text-[11px] text-zinc-400 truncate">
-                      {conv.title}
+                      {conversationLabel(conv)}
                     </p>
                     <p className="text-xs text-zinc-500 truncate mt-0.5">
                       {conv.lastMessage?.senderId === meId ? "Anda: " : ""}
@@ -382,7 +395,8 @@ export default function ChatRoom({
                     )}
                   </p>
                   <p className="text-xs text-zinc-500 truncate">
-                    {active.title} • {getStatusMeta(active.status, role).label}
+                    {conversationLabel(active)} •{" "}
+                    {getStatusMeta(active.status, role).label}
                   </p>
                 </div>
               </div>

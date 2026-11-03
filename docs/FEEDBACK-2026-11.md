@@ -106,8 +106,8 @@ lulus semua di URL produksi setelah deploy.
 
 # Ronde 2 (3 Nov 2026) — memperjelas alur & mencatat hasil negosiasi
 
-Status: **siap deploy, menunggu persetujuan** (butuh `prisma db push` di VPS karena ada
-kolom baru; belum dijalankan di produksi).
+Status: **LIVE di `https://kolabora.tech` dan fallback Vercel** (deploy 3 Nov 2026 jam
+18:55 WIB, commit `9032850`..`8a76785`, smoke **96/96** terhadap URL produksi).
 
 ## Pertanyaan tester
 
@@ -179,13 +179,50 @@ Audit data produksi (8 aturan konsistensi status vs `agreedAt`/`startedAt`/
 | Probe sinkronisasi dua sisi (`/tmp/deal-sync.mjs`) | **20/20** — satu klik tidak menaikkan tahap, penawaran ulang mereset konfirmasi, deal tertutup pada tarif sama, escrow = tarif negosiasi, jejak SYSTEM di chat |
 | Sisa data uji di `kolabora_dev` | dibersihkan, bentuk DB kembali 4 user / 3 campaign / 2 kolaborasi / 2 lamaran / 4 pesan |
 
-## Yang dibutuhkan saat deploy
+## Yang dibutuhkan saat deploy — dan yang sebenarnya dijalankan
 
-1. `npx prisma db push` di VPS (menambah 3 kolom, non-destruktif, default aman untuk
-   baris lama: `dealConfirmedBy = {}`).
-2. Tidak ada migrasi data: baris `NEGOTIATION` produksi yang ada (kolaborasi tester)
-   justru akan dimulai dari nol konfirmasi → kedua pihak harus klik "Konfirmasi Deal".
-   Baris lama yang sudah `AGREED` tidak disentuh dan di UI tidak mengklaim
-   "dikonfirmasi kedua pihak" kalau datanya memang tidak ada.
-3. Setelah deploy: smoke terhadap `https://kolabora.tech`, bersihkan baris
-   `SMOKE%`/`Uji%`/`Sinkronisasi%`, lalu cek kedua dashboard.
+Urutan aman yang dipakai (skema dulu, baru kode, supaya tidak ada host yang
+menjalankan kode dengan kolom belum ada):
+
+| # | Langkah | Hasil |
+|---|---|---|
+| 0 | Cadangan DB VPS sebelum menyentuh produksi | `/root/backups/kolabora-pre-deal-20261103T115353Z.sql.gz` (9,6 KB) |
+| 1 | 3 kolom additif di **Supabase** (DB fallback Vercel) lewat `ALTER TABLE … IF NOT EXISTS` | `dealConfirmedBy text[] NOT NULL DEFAULT ARRAY[]::text[]`, `dealAmount int`, `agreedNote text` — 2 kolaborasi lama tidak berubah |
+| 2 | 3 kolom yang sama di **PostgreSQL VPS** | sama; `konfirmasi {}`, `dealAmount` kosong untuk ketiga baris |
+| 3 | `git push origin main` → Vercel build dengan skema siap | `68f6bd6..8a76785` |
+| 4 | `bash scripts/deploy-vps.sh --domain kolabora.tech --port 3050 --no-caddy` | HEAD `8a76785`, `db push` jadi no-op, health `database: up` |
+| 5 | `BASE_URL=https://kolabora.tech node scripts/smoke-test.mjs` | **96/96 LULUS**, termasuk 13 pemeriksaan deal dua sisi (satu klik tetap `NEGOTIATION`, penawaran ulang mereset konfirmasi, escrow = tarif negosiasi Rp 1.100.000, `agree` lawas ditolak 400) |
+| 6 | Probe terautentikasi kedua host | VPS: `/api/collaborations` 200 + field deal ada; Vercel: 200 + field deal ada; halaman `history`/`analytics` 200, tidak ada lagi angka "/6" atau "dari 6" |
+| 7 | Pembersihan sisa uji dengan naskah berpenjaga (`/tmp/prod-cleanup.sql`) | dry-run (ROLLBACK) dulu, 4 penjaga keras lolos → COMMIT. 3 kolaborasi + 2 campaign + 1 lamaran + 8 pesan + 1 review + 21 notifikasi uji dihapus |
+
+Bentuk DB produksi **setelah** pembersihan: 9 user / 4 campaign / 3 kolaborasi /
+4 lamaran / 13 pesan / 0 review / 15 notifikasi, 0 pelanggaran invarian, dan
+**0 notifikasi yatim** (3 yatim sisa smoke 1 Nov ikut dibersihkan — diverifikasi
+dulu bahwa isinya string chat literal dari `scripts/smoke-test.mjs` dan link-nya
+menggantung).
+
+Kolaborasi `cmvxnqfch000nbzgcnbd5tjw0` (Review Koleksi Batik Ayu Solo, Rp 500.000,
+`NEGOTIATION`) **tidak disentuh** — tetap `dealConfirmedBy = {}` sehingga kedua sisi
+memang harus menekan "Konfirmasi Deal" sekali. Enam pesan chat aslinya utuh.
+
+## Temuan baru saat verifikasi produksi
+
+Akun tester `ARTIZ@gmail.com` ternyata berperan **INFLUENCER** dan satu-satunya
+lamarannya (campaign "Review Koleksi Batik Ayu Solo") berstatus **REJECTED** — ia
+tidak punya kolaborasi sama sekali. Jadi keluhannya soal "alur tidak jelas"
+dilihat dari sisi orang yang perjalanannya berhenti di tolakan, bukan dari dalam
+tahap negosiasi. Kolaborasi `NEGOTIATION` yang mereka lihat adalah milik akun demo
+`brand@kolabora.id` × `influencer@kolabora.id`.
+
+Implikasi untuk sesi uji berikutnya (butuh keputusan, jangan diubah diam-diam):
+- Tester perlu lamarannya dibuka lagi (accept) atau memakai akun demo agar bisa
+  mencoba tombol "Konfirmasi Deal" dari kursinya sendiri.
+- Perlu dipertimbangkan: memberi tahu pelamar bahwa lamarannya ditolak *dan* apa
+  yang bisa mereka lakukan setelahnya (cari campaign lain), karena tahap "ditolak"
+  sekarang diam.
+
+Baris demo untuk klik-manual dibuat di **DB dev lokal** saja (`kolabora_dev`):
+"Demo Alur Deal — Batik Nusantara (silakan dicoba)", `umkm@kolabora.id` ×
+`foodie@kolabora.id`, tarif lamaran Rp 750.000, 2 chat penawaran, nol konfirmasi
+sehingga kedua tombol aktif. Tidak ada baris demo yang dibuat di produksi.
+

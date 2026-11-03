@@ -14,94 +14,39 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { COLLAB_STAGES, type CollabStage } from "@/lib/collab";
 import type { Role as CollaborationRole } from "@/lib/collab";
 
 export interface FlowStage {
   key: string;
   label: string;
   description: string;
+  /** Aksi yang menggerakkan kolaborasi keluar dari tahap ini. */
+  trigger: string;
   icon: LucideIcon;
 }
 
-interface StageDefinition {
-  key: string;
-  icon: LucideIcon;
-  label: Record<CollaborationRole, string>;
-  description: Record<CollaborationRole, string>;
-}
-
-const STAGE_DEFINITIONS: StageDefinition[] = [
-  {
-    key: "matching",
-    icon: Zap,
-    label: { UMKM: "AI Smart Matching", INFLUENCER: "AI Smart Matching" },
-    description: {
-      UMKM: "AI merekomendasikan influencer paling cocok berdasarkan profil, niche, lokasi, audiens, dan performa.",
-      INFLUENCER: "AI merekomendasikan campaign paling cocok dengan profil, niche, tarif, dan jangkauan Anda.",
-    },
-  },
-  {
-    key: "proposal",
-    icon: Send,
-    label: { UMKM: "Ajukan Kolaborasi", INFLUENCER: "Terima Tawaran" },
-    description: {
-      UMKM: "Proposal kolaborasi dikirim ke influencer lengkap dengan detail brief dan penawaran.",
-      INFLUENCER: "Anda mengajukan diri ke campaign atau menerima tawaran kolaborasi dari brand.",
-    },
-  },
-  {
-    key: "negotiation",
-    icon: MessageSquare,
-    label: { UMKM: "Diskusi & Negosiasi", INFLUENCER: "Diskusi & Negosiasi" },
-    description: {
-      UMKM: "Kedua pihak berdiskusi via Chat untuk menyepakati brief, tarif, dan konsep konten.",
-      INFLUENCER: "Anda berdiskusi dengan brand via Chat untuk menyepakati brief, tarif, dan konsep konten.",
-    },
-  },
-  {
-    key: "agreement",
-    icon: Handshake,
-    label: { UMKM: "Konfirmasi & Escrow", INFLUENCER: "Setujui & Escrow" },
-    description: {
-      UMKM: "Deal dikonfirmasi dan dana campaign diamankan di sistem escrow sebagai jaminan.",
-      INFLUENCER: "Anda menyetujui kesepakatan brand; dana campaign dikunci di sistem escrow.",
-    },
-  },
-  {
-    key: "production",
-    icon: PenTool,
-    label: { UMKM: "Produksi Konten", INFLUENCER: "Produksi Konten" },
-    description: {
-      UMKM: "Influencer memproduksi konten sesuai brief yang telah disepakati.",
-      INFLUENCER: "Anda memproduksi konten sesuai brief yang telah disepakati dengan brand.",
-    },
-  },
-  {
-    key: "review",
-    icon: Eye,
-    label: { UMKM: "Review & Persetujuan", INFLUENCER: "Persetujuan Brand" },
-    description: {
-      UMKM: "Brand meninjau konten di Review Campaign — setujui atau minta revisi.",
-      INFLUENCER: "Brand meninjau konten Anda di Review Campaign — disetujui atau minta revisi.",
-    },
-  },
-  {
-    key: "completion",
-    icon: Banknote,
-    label: { UMKM: "Publikasi & Pembayaran", INFLUENCER: "Publikasi & Pembayaran" },
-    description: {
-      UMKM: "Konten tayang, dana escrow dicairkan otomatis, dan performa dianalisis di Analytics.",
-      INFLUENCER: "Konten tayang, dana escrow dicairkan ke Anda, dan performa dianalisis di Analytics.",
-    },
-  },
-];
+/**
+ * Label & deskripsi tahap ada di SATU sumber: `COLLAB_STAGES` (src/lib/collab.ts),
+ * dipakai juga oleh teks "Tahap x dari 7". Di sini hanya ikon yang dipetakan.
+ */
+const STAGE_ICONS: Record<string, LucideIcon> = {
+  matching: Zap,
+  proposal: Send,
+  negotiation: MessageSquare,
+  agreement: Handshake,
+  production: PenTool,
+  review: Eye,
+  completion: Banknote,
+};
 
 export function getCollaborationStages(role: CollaborationRole): FlowStage[] {
-  return STAGE_DEFINITIONS.map((s) => ({
+  return COLLAB_STAGES.map((s: CollabStage) => ({
     key: s.key,
-    icon: s.icon,
+    icon: STAGE_ICONS[s.key] ?? Sparkles,
     label: s.label[role],
     description: s.description[role],
+    trigger: s.trigger[role],
   }));
 }
 
@@ -127,8 +72,7 @@ const STAGE_STATUS: Record<
     },
     agreement: {
       label: "Dikonfirmasi",
-      className:
-        "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
+      className: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
     },
     production: {
       label: "Produksi Konten",
@@ -153,7 +97,7 @@ const STAGE_STATUS: Record<
         "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
     },
     proposal: {
-      label: "Tawaran Diterima",
+      label: "Ajuan Diterima",
       className:
         "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
     },
@@ -164,8 +108,7 @@ const STAGE_STATUS: Record<
     },
     agreement: {
       label: "Deal Disetujui",
-      className:
-        "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
+      className: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
     },
     production: {
       label: "Produksi Konten",
@@ -270,13 +213,17 @@ export function CollaborationProgress({
         <div key={s.key} className="flex items-center" title={s.label}>
           <span
             className={`h-2 rounded-full transition-all ${
-              i <= currentIndex ? "w-5 bg-kolabora" : "w-2 bg-zinc-200 dark:bg-zinc-700"
+              i <= currentIndex
+                ? "w-5 bg-kolabora"
+                : "w-2 bg-zinc-200 dark:bg-zinc-700"
             }`}
           />
           {i < stages.length - 1 && (
             <span
               className={`w-1.5 h-0.5 rounded-full ${
-                i < currentIndex ? "bg-kolabora" : "bg-zinc-200 dark:bg-zinc-700"
+                i < currentIndex
+                  ? "bg-kolabora"
+                  : "bg-zinc-200 dark:bg-zinc-700"
               }`}
             />
           )}
@@ -304,7 +251,9 @@ export function CollaborationTimeline({
             {!isLast && (
               <span
                 className={`absolute left-[17px] top-10 bottom-[-16px] w-0.5 rounded-full ${
-                  i < currentIndex ? "bg-kolabora" : "bg-zinc-200 dark:bg-zinc-700"
+                  i < currentIndex
+                    ? "bg-kolabora"
+                    : "bg-zinc-200 dark:bg-zinc-700"
                 }`}
               />
             )}
@@ -349,6 +298,19 @@ export function CollaborationTimeline({
               >
                 {s.description}
               </p>
+              {status !== "done" && (
+                // Pemicu: apa yang menggerakkan kolaborasi keluar dari tahap ini.
+                <p
+                  className={`text-[11px] mt-1 flex items-start gap-1 ${
+                    status === "current"
+                      ? "text-kolabora"
+                      : "text-zinc-400 dark:text-zinc-600"
+                  }`}
+                >
+                  <ArrowRight className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>{s.trigger}</span>
+                </p>
+              )}
             </div>
           </li>
         );

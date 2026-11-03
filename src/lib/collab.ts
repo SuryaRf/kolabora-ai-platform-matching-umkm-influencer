@@ -40,6 +40,12 @@ export interface CollabDTO {
   status: CollabStatus;
   escrowStatus: string | null;
   escrowAmount: number | null;
+  /** id peserta yang sudah menekan "Konfirmasi Deal" pada tahap NEGOTIATION. */
+  dealConfirmedBy: string[];
+  /** Tarif final yang terkunci saat deal jadi (AGREED). */
+  dealAmount: number | null;
+  /** Catatan singkat kesepakatan (deliverables, tenggat, dsb). */
+  agreedNote: string | null;
   campaign: { id: string; title: string } | null;
   participants: CollabParticipant[];
   unreadCount: number;
@@ -52,6 +58,128 @@ export interface CollabDTO {
   approvedAt: string | null;
   completedAt: string | null;
 }
+
+/**
+ * SATU SUMBER KEBENARAN untuk 7 tahap alur kolaborasi.
+ * `CollaborationFlow.tsx` (stepper/progress/timeline) dan kartu riwayat sama-sama
+ * membaca daftar ini, jadi jumlah tahap di teks "Tahap x dari 7" tidak bisa lagi
+ * berbeda dari kotak yang ditampilkan. Ikon tetap milik komponen.
+ *
+ * PENTING: indeks array ini == angka `statusToStep()` (0-based). Mengubah urutan
+ * di sini berarti menggeser mesin status, jadi jangan menambah/memindah tahap
+ * tanpa menyesuaikan STEP_BY_STATUS, isActiveStep, dan filter "selesai".
+ */
+export interface CollabStage {
+  key: string;
+  label: Record<Role, string>;
+  description: Record<Role, string>;
+  /** Kalimat pemicu: aksi apa yang membuat kolaborasi keluar dari tahap ini. */
+  trigger: Record<Role, string>;
+}
+
+export const COLLAB_STAGES: CollabStage[] = [
+  {
+    key: "matching",
+    label: { UMKM: "AI Smart Matching", INFLUENCER: "AI Smart Matching" },
+    description: {
+      UMKM: "AI merekomendasikan influencer paling cocok berdasarkan profil, niche, lokasi, audiens, dan performa.",
+      INFLUENCER:
+        "AI merekomendasikan campaign paling cocok dengan profil, niche, tarif, dan jangkauan Anda.",
+    },
+    trigger: {
+      UMKM: "Pemicu lanjut: temukan kandidat di AI Smart Matching, lalu kirim proposal.",
+      INFLUENCER:
+        "Pemicu lanjut: temukan campaign di Discover/smart matching, lalu kirim lamaran.",
+    },
+  },
+  {
+    key: "proposal",
+    label: { UMKM: "Ajukan Kolaborasi", INFLUENCER: "Lamar / Terima Tawaran" },
+    description: {
+      UMKM: "Proposal kolaborasi dikirim ke influencer lengkap dengan detail brief dan penawaran.",
+      INFLUENCER:
+        "Anda melamar campaign yang terbuka, atau menerima tawaran langsung dari brand.",
+    },
+    trigger: {
+      UMKM: "Pemicu lanjut: influencer menerima lamaran/undangan Anda.",
+      INFLUENCER:
+        "Pemicu lanjut: brand menyetujui lamaran Anda, atau Anda menekan Terima Tawaran.",
+    },
+  },
+  {
+    key: "negotiation",
+    label: { UMKM: "Diskusi & Negosiasi", INFLUENCER: "Diskusi & Negosiasi" },
+    description: {
+      UMKM: "Kedua pihak berdiskusi via Chat soal brief, tarif, dan konsep konten.",
+      INFLUENCER:
+        "Anda dan brand berdiskusi via Chat soal brief, tarif, dan konsep konten.",
+    },
+    trigger: {
+      UMKM: "Pemicu lanjut: DEAL dikonfirmasi kedua pihak dengan tarif final yang sama.",
+      INFLUENCER:
+        "Pemicu lanjut: DEAL dikonfirmasi Anda dan brand dengan tarif final yang sama.",
+    },
+  },
+  {
+    key: "agreement",
+    label: { UMKM: "Konfirmasi & Escrow", INFLUENCER: "Konfirmasi & Escrow" },
+    description: {
+      UMKM: "Deal terkunci setelah brand dan kreator sama-sama mengonfirmasi; brand lalu mengamankannya di sistem escrow.",
+      INFLUENCER:
+        "Deal terkunci setelah Anda dan brand sama-sama mengonfirmasi; brand mengamankan dana di sistem escrow.",
+    },
+    trigger: {
+      UMKM: "Pemicu lanjut: Anda menekan Bayar & Kunci Escrow, lalu kreator menekan Mulai Produksi.",
+      INFLUENCER:
+        "Pemicu lanjut: brand mengunci escrow, kemudian Anda menekan Mulai Produksi.",
+    },
+  },
+  {
+    key: "production",
+    label: { UMKM: "Produksi Konten", INFLUENCER: "Produksi Konten" },
+    description: {
+      UMKM: "Influencer memproduksi konten sesuai brief dan kesepakatan tarif.",
+      INFLUENCER:
+        "Anda memproduksi konten sesuai brief dan kesepakatan tarif dengan brand.",
+    },
+    trigger: {
+      UMKM: "Pemicu lanjut: influencer mengirim konten untuk direview.",
+      INFLUENCER: "Pemicu lanjut: Anda menekan Kirim Konten (URL atau file).",
+    },
+  },
+  {
+    key: "review",
+    label: { UMKM: "Review & Persetujuan", INFLUENCER: "Persetujuan Brand" },
+    description: {
+      UMKM: "Brand meninjau konten di Review Campaign — setujui atau minta revisi.",
+      INFLUENCER: "Brand meninjau konten Anda — disetujui atau diminta revisi.",
+    },
+    trigger: {
+      UMKM: "Pemicu lanjut: Anda menekan Setujui. Minta Revisi mengembalikan kreator ke tahap produksi.",
+      INFLUENCER:
+        "Pemicu lanjut: brand menekan Setujui. Minta Revisi mengembalikan Anda ke tahap produksi.",
+    },
+  },
+  {
+    key: "completion",
+    label: {
+      UMKM: "Publikasi & Pembayaran",
+      INFLUENCER: "Publikasi & Pembayaran",
+    },
+    description: {
+      UMKM: "Konten tayang, dana escrow dicairkan ke influencer, dan performa dianalisis di Analytics.",
+      INFLUENCER:
+        "Konten tayang, dana escrow dicairkan ke Anda, dan performa dianalisis di Analytics.",
+    },
+    trigger: {
+      UMKM: "Pemicu selesai: Anda menekan Cairkan Dana setelah konten disetujui.",
+      INFLUENCER:
+        "Pemicu selesai: brand mencairkan escrow — dana menjadi hak Anda.",
+    },
+  },
+];
+
+export const STAGE_COUNT = COLLAB_STAGES.length;
 
 const STEP_BY_STATUS: Record<CollabStatus, number> = {
   PROPOSED: 1,
@@ -92,9 +220,11 @@ export function isWaitingStep(step: number): boolean {
 
 /**
  * Teks posisi tahap untuk kartu & daftar.
- * CANCELLED dipetakan ke tahap 0 oleh STEP_BY_STATUS, jadi tanpa penjagaan ini
- * baris kolaborasi yang dibatalkan menampilkan "Tahap 0 dari 6". Status itu
- * sudah ditampilkan oleh badge "Dibatalkan", jadi stagesya tidak perlu lagi.
+ * `statusToStep()` mengembalikan INDEKS tahap (0-based) dari COLLAB_STAGES, jadi
+ * angka yang dibaca manusia adalah indeks+1 dan totalnya STAGE_COUNT (7), bukan
+ * angka lama yang hardcoded "/6".
+ * CANCELLED dipetakan ke tahap 0, tapi statusnya sudah ditampilkan oleh badge
+ * "Dibatalkan", jadi tidak perlu baris tahap.
  */
 export function stageHint(
   status: CollabStatus,
@@ -102,7 +232,123 @@ export function stageHint(
 ): string | null {
   const step = statusToStep(status);
   if (step === 0) return null;
-  return compact ? `Tahap ${step}/6` : `Tahap ${step} dari 6`;
+  const shown = step + 1;
+  return compact
+    ? `Tahap ${shown}/${STAGE_COUNT}`
+    : `Tahap ${shown} dari ${STAGE_COUNT}`;
+}
+
+/**
+ * Posisi timeline untuk kartu. CANCELLED memakai -1 supaya seluruh kotak abu
+ * (bukan justru menandai tahap pertama sebagai "sedang berjalan").
+ */
+export function stageIndexFor(status: CollabStatus): number {
+  return status === "CANCELLED" ? -1 : statusToStep(status);
+}
+
+/** Nama sisi yang tampil di UI, netran terhadap peran. */
+export function sideName(role: Role): string {
+  return role === "UMKM" ? "brand" : "kreator";
+}
+
+export interface DealState {
+  /** Jumlah peserta yang sudah menekan "Konfirmasi Deal". */
+  confirmedCount: number;
+  totalParticipants: number;
+  iConfirmed: boolean;
+  peerConfirmed: boolean;
+  /** Pihak lain belum ikut mengonfirmasi. */
+  waitingForPeer: boolean;
+  /** Semua sudah konfirmasi — deal akan/berstatus AGREED. */
+  readyToClose: boolean;
+}
+
+/**
+ * Status konfirmasi dua sisi dari data kolaborasi. Dipakai untuk mengganti label
+ * tombol dan menulis baris "Giliran: …" supaya user tidak mengira kliknya
+ * langsung menyelesaikan deal.
+ */
+export function getDealState(
+  item: Pick<CollabDTO, "status" | "dealConfirmedBy" | "participants">,
+  meId: string,
+): DealState {
+  const confirmed = item.dealConfirmedBy ?? [];
+  const total = item.participants.length || 2;
+  const confirmedCount = item.participants.filter((p) =>
+    confirmed.includes(p.id),
+  ).length;
+  const iConfirmed = confirmed.includes(meId);
+  return {
+    confirmedCount,
+    totalParticipants: total,
+    iConfirmed,
+    peerConfirmed: confirmedCount > (iConfirmed ? 1 : 0),
+    waitingForPeer: item.status === "NEGOTIATION" && iConfirmed,
+    readyToClose: item.status === "NEGOTIATION" && confirmedCount >= total,
+  };
+}
+
+export interface TurnInfo {
+  /** Pihak yang memegang kendali pada tahap ini. */
+  owner: Role | "SELESAI" | "BOTH";
+  itIsMyTurn: boolean;
+  /** Baris pendek: "Giliran brand: bayar & kunci escrow". */
+  text: string;
+}
+
+const TURN: Record<
+  CollabStatus,
+  { owner: Role | "SELESAI" | "BOTH"; what: string }
+> = {
+  PROPOSED: { owner: "INFLUENCER", what: "menanggapi tawaran brand" },
+  // Kedua pihak punya tombol "Konfirmasi Deal" di tahap ini.
+  NEGOTIATION: { owner: "BOTH", what: "menyepakati tarif final" },
+  AGREED: { owner: "UMKM", what: "bayar & kunci escrow" },
+  ESCROW_HELD: { owner: "INFLUENCER", what: "klik Mulai Produksi" },
+  IN_PRODUCTION: { owner: "INFLUENCER", what: "kirim konten untuk direview" },
+  CONTENT_SUBMITTED: {
+    owner: "UMKM",
+    what: "review konten di Review Campaign",
+  },
+  UNDER_REVIEW: { owner: "UMKM", what: "menyelesaikan review konten" },
+  REVISION_REQUESTED: {
+    owner: "INFLUENCER",
+    what: "perbaiki lalu kirim ulang konten",
+  },
+  APPROVED: { owner: "UMKM", what: "cairkan dana escrow" },
+  COMPLETED: {
+    owner: "SELESAI",
+    what: "Kolaborasi selesai — escrow sudah dicairkan",
+  },
+  CANCELLED: { owner: "SELESAI", what: "Kolaborasi dibatalkan" },
+  DISPUTED: { owner: "SELESAI", what: "Menunggu penanganan admin" },
+};
+
+/**
+ * "Giliran siapa + ngapain" — dipakai saat kartu tidak punya tombol aksi, supaya
+ * sisi yang sedang menunggu tetap tahu pemicu berikutnya (bukan hanya diam).
+ * Mengembalikan null bila tahap ini sudah memberi saya tombol, atau bila kedua
+ * pihak memang sama-sama menunggu (deal dua konfirmasi).
+ */
+export function getTurnInfo(
+  status: CollabStatus,
+  role: Role,
+  actions: CollabAction[],
+): TurnInfo | null {
+  const turn = TURN[status];
+  if (!turn || turn.owner === "BOTH") return null;
+  if (turn.owner === role && actions.length > 0) return null;
+  if (turn.owner === "SELESAI") {
+    return { owner: turn.owner, itIsMyTurn: false, text: turn.what };
+  }
+  return {
+    owner: turn.owner,
+    itIsMyTurn: turn.owner === role,
+    text:
+      turn.owner === role
+        ? `Giliran Anda: ${turn.what}`
+        : `Giliran ${sideName(turn.owner)}: ${turn.what}`,
+  };
 }
 
 const STATUS_META: Record<
@@ -171,7 +417,8 @@ export function getStatusMeta(status: CollabStatus, role: Role) {
   return { label: meta.label[role], className: meta.className };
 }
 
-export type ActionTone = "primary" | "success" | "warning" | "danger" | "escrow";
+export type ActionTone =
+  "primary" | "success" | "warning" | "danger" | "escrow";
 
 export interface CollabAction {
   key: string;
@@ -182,6 +429,8 @@ export interface CollabAction {
   payment?: "hold" | "release";
   /** Ask the influencer to attach content when running this action. */
   requiresContent?: boolean;
+  /** Ask for final rate + note (deal dua konfirmasi) before running. */
+  requiresDeal?: boolean;
   /** Secondary deep link. */
   href?: { label: string; to: "chat" | "review" };
 }
@@ -198,6 +447,12 @@ export function actionClassName(tone: ActionTone) {
   return TONES[tone];
 }
 
+/**
+ * Tombol yang bisa ditekan pihak ini pada tahap ini.
+ * `hint` ditulis sebagai PEMICU (aksi apa yang menggerakkan tahap) + apa
+ * berikutnya — bukan kalimat yang membaca seolah sesuatu sudah selesai.
+ * Daftar lengkap status -> giliran ada di TURN/getTurnInfo.
+ */
 export function getCollabActions(
   status: CollabStatus,
   role: Role,
@@ -207,10 +462,11 @@ export function getCollabActions(
       case "NEGOTIATION":
         return [
           {
-            key: "agree",
-            label: "Sepakati Deal",
-            hint: "Brief, tarif, dan konsep konten sudah disepakati.",
+            key: "confirm_deal",
+            label: "Konfirmasi Deal",
+            hint: "Kalau brief dan tarif di chat sudah cocok, klik untuk mengonfirmasi deal dengan tarif final. Deal terkunci setelah kreator ikut konfirmasi.",
             tone: "primary",
+            requiresDeal: true,
             href: { label: "Buka Chat", to: "chat" },
           },
         ];
@@ -219,17 +475,20 @@ export function getCollabActions(
           {
             key: "hold_escrow",
             label: "Bayar & Kunci Escrow",
-            hint: "Dana campaign ditahan di escrow sampai konten disetujui.",
+            hint: "Deal sudah final. Kunci dana escrow sesuai tarif kesepakatan — setelah ini kreator bisa mulai produksi.",
             tone: "escrow",
             payment: "hold",
           },
         ];
+      // UNDER_REVIEW = brand sedang menimbang; tanpa kasus ini tahap itu jadi
+      // jalan buntu (tidak ada tombol di sisi mana pun).
       case "CONTENT_SUBMITTED":
+      case "UNDER_REVIEW":
         return [
           {
             key: "open_review",
             label: "Review Konten",
-            hint: "Konten sudah dikirim influencer dan siap ditinjau.",
+            hint: "Konten sudah dikirim. Buka Review Campaign lalu tekan Setujui (lanjut ke pencairan) atau Minta Revisi.",
             tone: "primary",
             href: { label: "Buka Review", to: "review" },
           },
@@ -239,7 +498,7 @@ export function getCollabActions(
           {
             key: "release_escrow",
             label: "Cairkan Dana",
-            hint: "Konten disetujui — cairkan dana escrow ke influencer.",
+            hint: "Konten disetujui. Cairkan escrow untuk menutup kolaborasi.",
             tone: "success",
             payment: "release",
           },
@@ -249,7 +508,7 @@ export function getCollabActions(
           {
             key: "cancel",
             label: "Batalkan",
-            hint: "Tawaran belum direspons influencer.",
+            hint: "Kreator belum menanggapi. Tekan Batalkan untuk menarik tawaran ini.",
             tone: "danger",
           },
         ];
@@ -264,7 +523,7 @@ export function getCollabActions(
         {
           key: "accept",
           label: "Terima Tawaran",
-          hint: "Terima tawaran brand untuk mulai berdiskusi.",
+          hint: "Klik Terima Tawaran untuk masuk ke diskusi via Chat dengan brand.",
           tone: "primary",
           href: { label: "Buka Chat", to: "chat" },
         },
@@ -272,10 +531,11 @@ export function getCollabActions(
     case "NEGOTIATION":
       return [
         {
-          key: "agree",
-          label: "Setujui Deal",
-          hint: "Setujui brief dan tarif yang disepakati.",
+          key: "confirm_deal",
+          label: "Konfirmasi Deal",
+          hint: "Kalau brief dan tarif di chat sudah cocok, klik untuk mengonfirmasi deal dengan tarif final. Deal terkunci setelah brand ikut konfirmasi.",
           tone: "primary",
+          requiresDeal: true,
           href: { label: "Buka Chat", to: "chat" },
         },
       ];
@@ -284,7 +544,7 @@ export function getCollabActions(
         {
           key: "start_production",
           label: "Mulai Produksi",
-          hint: "Dana sudah aman di escrow. Mulai produksi konten.",
+          hint: "Dana escrow sudah terkunci. Klik Mulai Produksi, lalu kirim kontennya untuk direview.",
           tone: "primary",
         },
       ];
@@ -294,7 +554,7 @@ export function getCollabActions(
         {
           key: "submit_content",
           label: "Kirim Konten",
-          hint: "Unggah konten final atau tautan konten untuk direview brand.",
+          hint: "Unggah atau tautkan konten final agar brand bisa menyetujui dan mencairkan dana.",
           tone: "primary",
           requiresContent: true,
         },

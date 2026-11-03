@@ -125,7 +125,14 @@ export async function PATCH(req: Request) {
           brief: application.campaign.description,
           budget:
             application.proposedRate ?? application.campaign.budgetMin,
-          status: "PROPOSED",
+          // Jalur ini bukan tawaran yang harus direspons influencer: dia yang
+          // melamar dan UMKM sudah menyetujui. Maka kolaborasi lahir langsung
+          // di tahap diskusi (NEGOTIATION), bukan PROPOSED yang berarti
+          // "menunggu respons" — kalau tidak, dashboard sisi influencer masih
+          // menampilkan "Terima Tawaran" dan sisi UMKM "Ajukan Kolaborasi"
+          // padahal lamarannya sudah diterima.
+          // Jalur undangan langsung (POST /api/collaborations) tetap PROPOSED.
+          status: "NEGOTIATION",
           participants: {
             connect: [
               { id: session.user.id },

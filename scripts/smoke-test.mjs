@@ -7,11 +7,12 @@
  *   SMOKE_UMKM=umkm@kolabora.id SMOKE_KOL=influencer@kolabora.id SMOKE_PASS=password123 node scripts/smoke-test.mjs
  *
  * Alur yang diuji (sesuai mesin status di /api/collaborations/[id]/action):
- *   lamar -> terima lamaran -> accept (INFLUENCER) -> agree -> hold_escrow (UMKM)
+ *   lamar -> terima lamaran (langsung NEGOTIATION) -> agree -> hold_escrow (UMKM)
  *   -> start_production (INFLUENCER) -> kirim konten (POST /api/reviews)
  *   -> approve (PATCH /api/reviews) -> complete/lepas escrow (UMKM)
  * plus endpoint AI, endpoint insight berbasis data asli, penjaga peran,
- * undangan kolaborasi dari halaman Highlights, dan pemanggilan seluruh halaman.
+ * undangan kolaborasi dari halaman Highlights (accept PROPOSED -> NEGOTIATION,
+ * lalu dibatalkan), dan pemanggilan seluruh halaman.
  */
 
 const BASE = (process.env.BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
@@ -159,9 +160,20 @@ async function main() {
   check("UMKM menerima pelamar", accept.status === 200 && Boolean(collabId), `status=${accept.status}`);
   if (!collabId) return finish();
 
+  // Lamaran yang diterima TIDAK boleh lagi berstatus "menunggu respons"
+  // (PROPOSED) — influencer sudah menyatakan diri lewat lamaran, jadi kolaborasi
+  // harus langsung masuk tahap diskusi/negosiasi. Kalau ada regresi di sini,
+  // kedua dashboard kembali menampilkan "Terima Tawaran" / "Ajukan Kolaborasi".
+  check(
+    "kolaborasi dari lamaran langsung mulai di NEGOTIATION",
+    accept.json?.collaboration?.status === "NEGOTIATION",
+    `status=${accept.json?.collaboration?.status ?? "kosong"}`,
+  );
+
   const asRole = (role) => (role === "UMKM" ? umkm : kol);
+  // accept (INFLUENCER) tidak diuji di sini: aksi itu milik jalur undangan
+  // langsung, dan porsinya ada di blok "Undangan dari halaman Highlights".
   const flow = [
-    ["accept", "INFLUENCER", {}],
     ["agree", "INFLUENCER", {}],
     ["hold_escrow", "UMKM", { amount: 1500000 }],
     ["start_production", "INFLUENCER", {}],
@@ -370,11 +382,46 @@ async function main() {
     const inviteId = invite.json?.id;
     check("UMKM mengundang kreator dari Highlights", [200, 201].includes(invite.status) && Boolean(inviteId), `status=${invite.status} ${invite.json?.error ?? ""}`);
     if (inviteId) {
+      // Jalur undangan langsung harus TETAP mulai di PROPOSED (pembeda dari
+      // jalur lamaran yang kini langsung NEGOTIATION) dan aksi `accept` harus
+      // tetap jalan, supaya tidak ada kolaborasi lama yang macet.
+      check(
+        "undangan langsung lahir di PROPOSED",
+        invite.json?.status === "PROPOSED",
+        `status=${invite.json?.status ?? "kosong"}`,
+      );
       const listAfter = await umkm.request("/api/collaborations");
       const found = (listAfter.json ?? []).find((c) => c.id === inviteId);
       check("undangan muncul di daftar kolaborasi UMKM", Boolean(found), `status=${found?.status ?? "tidak ada"}`);
       const cancelled = await umkm.request(`/api/collaborations/${inviteId}/action`, { method: "POST", body: { action: "cancel" } });
       check("undangan uji bisa dibatalkan", cancelled.status === 200, `status=${cancelled.status} ${cancelled.json?.error ?? ""}`);
+    }
+
+    // Undangan ke akun uji itu sendiri: hanya akun ini yang bisa menjalankan
+    // aksi `accept`, dan transisi PROPOSED -> NEGOTIATION wajib tetap ada.
+    const offer = await umkm.request("/api/collaborations", {
+      method: "POST",
+      body: {
+        participantId: kol.user.id,
+        title: "SMOKE Uji terima tawaran",
+        brief: "Uji otomatis: menerima tawaran brand lewat aksi accept.",
+        budget: ownActive?.budgetMin ?? 500000,
+        campaignId: ownActive?.id ?? null,
+      },
+    });
+    const offerId = offer.json?.id;
+    if (offerId) {
+      check(
+        "tawaran langsung lahir di PROPOSED",
+        offer.json?.status === "PROPOSED",
+        `status=${offer.json?.status ?? "kosong"}`,
+      );
+      const offerAccepted = await kol.request(`/api/collaborations/${offerId}/action`, { method: "POST", body: { action: "accept" } });
+      check("aksi accept (INFLUENCER) pada undangan langsung", offerAccepted.status === 200 && offerAccepted.json?.status === "NEGOTIATION", `status=${offerAccepted.status} collab=${offerAccepted.json?.status ?? "-"}`);
+      const offerCancelled = await umkm.request(`/api/collaborations/${offerId}/action`, { method: "POST", body: { action: "cancel" } });
+      check("tawaran uji bisa dibatalkan", offerCancelled.status === 200, `status=${offerCancelled.status} ${offerCancelled.json?.error ?? ""}`);
+    } else {
+      check("membuat tawaran untuk akun uji", false, `status=${offer.status} ${offer.json?.error ?? ""}`);
     }
   } else {
     check("UMKM mengundang kreator dari Highlights", false, "tidak ada kreator untuk diundang");

@@ -172,7 +172,11 @@ async function main() {
     proposal:
       "Hai Kopi Senja! Saya Rizky, food vlogger Jogja dengan 128K followers. Saya bisa bikin konten proses racikan signature dengan gaya ASMR yang engaging, plus rekomendasi menu.",
     proposedRate: 1500000,
-    status: "PENDING",
+    // Lamaran ini yang melahirkan kolaborasi di bawah, jadi statusnya harus
+    // ACCEPTED. Dulu PENDING: brand melihat "1 pelamar baru" untuk orang yang
+    // kolaborasinya sudah jalan — dan satu lamaran yang belum diputus tidak boleh
+    // berdampingan dengan kartu terbuka untuk campaign + kreator yang sama.
+    status: "ACCEPTED",
   });
 
   // Active collaboration: Rizky x Kopi Senja (production stage, escrow held)
@@ -193,6 +197,11 @@ async function main() {
           "Buat 2 video TikTok yang menampilkan proses racikan signature barista. Durasi 45-60 detik, vertikal, dengan voice-over storytelling. Kirim draft untuk review sebelum publikasi.",
         budget: 1500000,
         status: "IN_PRODUCTION",
+        // Deal dua sisi (ronde 2): harga terkunci + keduanya sudah konfirmasi,
+        // dan waktunya berurutan — dibuat <= deal <= escrow <= produksi.
+        createdAt: daysAgo(6),
+        dealAmount: 1500000,
+        dealConfirmedBy: [ayu.id, rizky.id],
         escrowAmount: 1500000,
         escrowStatus: "HELD",
         escrowHeldAt: daysAgo(3),
@@ -208,6 +217,23 @@ async function main() {
   if (existingMessages === 0) {
     await prisma.message.createMany({
       data: [
+        {
+          collaborationId: active.id,
+          senderId: ayu.id,
+          content: `${ayu.name} sudah mengonfirmasi deal Rp 1.500.000. Deal terkunci setelah ${rizky.name} ikut mengonfirmasi.`,
+          type: "SYSTEM",
+          read: true,
+          createdAt: daysAgo(5),
+        },
+        {
+          collaborationId: active.id,
+          senderId: rizky.id,
+          content:
+            "Deal final Rp 1.500.000 dikonfirmasi kedua belah pihak. Berikutnya: brand mengunci dana escrow, lalu kreator memulai produksi.",
+          type: "SYSTEM",
+          read: true,
+          createdAt: daysAgo(4),
+        },
         {
           collaborationId: active.id,
           senderId: ayu.id,

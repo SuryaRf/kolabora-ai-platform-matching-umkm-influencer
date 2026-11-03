@@ -2,6 +2,36 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notify";
+import { z } from "zod";
+import type { Application, Collaboration } from "@prisma/client";
+
+/** Penanda internal bahwa lamaran sudah diputus — bukan error sistem. */
+class AlreadyDecided extends Error {
+  constructor() {
+    super("already-decided");
+  }
+}
+
+/**
+ * Status yang masih boleh diputus brand. Setelah ACCEPTED/REJECTED, lamaran
+ * itu selesai — dulu tidak ada penjaga ini, jadi satu klik "Tolak" setelah
+ * lamaran diterima bisa membalik statusnya sementara kolaborasinya tetap
+ * hidup (kolaborasi yatim tanpa lamaran aktif).
+ */
+const DECIDABLE = ["PENDING", "REVIEWED"] as const;
+
+const decideSchema = z.object({
+  id: z.string().min(1),
+  action: z.enum(["accept", "reject"]),
+  // Catatan opsional saat menolak, supaya kreator tahu apa yang bisa diperbaiki.
+  // Dibatasi pendek: ini arahan, bukan ruang curhat.
+  note: z
+    .string()
+    .trim()
+    .max(200, "Catatan maksimal 200 karakter")
+    .optional()
+    .nullable(),
+});
 
 export async function GET() {
   try {
@@ -57,14 +87,15 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { id, action } = (await req.json()) as {
-      id?: string;
-      action?: "accept" | "reject";
-    };
-
-    if (!id || (action !== "accept" && action !== "reject")) {
-      return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const parsed = decideSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Data tidak valid" },
+        { status: 400 },
+      );
     }
+    const { id, action, note } = parsed.data;
 
     const application = await prisma.application.findUnique({
       where: { id },
@@ -81,17 +112,38 @@ export async function PATCH(req: Request) {
       );
     }
 
+    if (!(DECIDABLE as readonly string[]).includes(application.status)) {
+      return NextResponse.json(
+        { error: "Lamaran ini sudah diputus sebelumnya" },
+        { status: 409 },
+      );
+    }
+
     if (action === "reject") {
-      const updated = await prisma.application.update({
+      // updateMany + filter status: dua brand yang menolak bersamaan tidak
+      // saling menimpa, dan catatan pertama yang menang.
+      const decided = await prisma.application.updateMany({
+        where: { id, status: { in: [...DECIDABLE] } },
+        data: { status: "REJECTED", feedback: note ?? null },
+      });
+      if (decided.count === 0) {
+        return NextResponse.json(
+          { error: "Lamaran sudah diputus, muat ulang halaman" },
+          { status: 409 },
+        );
+      }
+      const updated = await prisma.application.findUniqueOrThrow({
         where: { id },
-        data: { status: "REJECTED" },
       });
       await notify(
         application.applicantId,
         "APPLICATION",
         "Lamaran belum cocok",
-        `Lamaran Anda untuk "${application.campaign.title}" belum dapat diterima kali ini.`,
-        "/dashboard/influencer/campaigns",
+        `Lamaran Anda untuk "${application.campaign.title}" belum dapat diterima kali ini.` +
+          (note ? ` Catatan dari brand: “${note}”.` : ""),
+        // Tujuannya tab Lamaran, bukan halaman yang membuka tab Kolaborasi —
+        // dulu kreator mendarat di daftar yang justru tidak memuat lamarannya.
+        "/dashboard/influencer/campaigns?tab=lamaran",
       );
       return NextResponse.json(updated);
     }
@@ -113,35 +165,56 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const [updated, collaboration] = await prisma.$transaction([
-      prisma.application.update({
-        where: { id },
-        data: { status: "ACCEPTED" },
-      }),
-      prisma.collaboration.create({
-        data: {
-          campaignId: application.campaignId,
-          title: application.campaign.title,
-          brief: application.campaign.description,
-          budget:
-            application.proposedRate ?? application.campaign.budgetMin,
-          // Jalur ini bukan tawaran yang harus direspons influencer: dia yang
-          // melamar dan UMKM sudah menyetujui. Maka kolaborasi lahir langsung
-          // di tahap diskusi (NEGOTIATION), bukan PROPOSED yang berarti
-          // "menunggu respons" — kalau tidak, dashboard sisi influencer masih
-          // menampilkan "Terima Tawaran" dan sisi UMKM "Ajukan Kolaborasi"
-          // padahal lamarannya sudah diterima.
-          // Jalur undangan langsung (POST /api/collaborations) tetap PROPOSED.
-          status: "NEGOTIATION",
-          participants: {
-            connect: [
-              { id: session.user.id },
-              { id: application.applicantId },
-            ],
+    let decidedApplication: Application | null = null;
+    let collaboration: Collaboration | null = null;
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        // Penjaga balapan: kalau lamaran ini sudah diputus di tab lain,
+        // jangan sampai kolaborasi kedua dibuat untuk pelamar yang sama.
+        const decided = await tx.application.updateMany({
+          where: { id, status: { in: [...DECIDABLE] } },
+          data: { status: "ACCEPTED" },
+        });
+        if (decided.count === 0) throw new AlreadyDecided();
+        const collab = await tx.collaboration.create({
+          data: {
+            campaignId: application.campaignId,
+            title: application.campaign.title,
+            brief: application.campaign.description,
+            budget:
+              application.proposedRate ?? application.campaign.budgetMin,
+            // Jalur ini bukan tawaran yang harus direspons influencer: dia yang
+            // melamar dan UMKM sudah menyetujui. Maka kolaborasi lahir langsung
+            // di tahap diskusi (NEGOTIATION), bukan PROPOSED yang berarti
+            // "menunggu respons" — kalau tidak, dashboard sisi influencer masih
+            // menampilkan "Terima Tawaran" dan sisi UMKM "Ajukan Kolaborasi"
+            // padahal lamarannya sudah diterima.
+            // Jalur undangan langsung (POST /api/collaborations) tetap PROPOSED.
+            status: "NEGOTIATION",
+            participants: {
+              connect: [
+                { id: session.user.id },
+                { id: application.applicantId },
+              ],
+            },
           },
-        },
-      }),
-    ]);
+        });
+        const fresh = await tx.application.findUniqueOrThrow({ where: { id } });
+        return { fresh, collab };
+      });
+      decidedApplication = result.fresh;
+      collaboration = result.collab;
+    } catch (error) {
+      if (error instanceof AlreadyDecided) {
+        return NextResponse.json(
+          { error: "Lamaran sudah diputus, muat ulang halaman" },
+          { status: 409 },
+        );
+      }
+      throw error;
+    }
+
+    const updated = decidedApplication;
 
     await prisma.message.create({
       data: {

@@ -208,6 +208,9 @@ model Application {
   proposal    String            @db.Text
   proposedRate Int?
   status      ApplicationStatus @default(PENDING)
+  /// Catatan singkat dari brand saat menolak lamaran, supaya pihak kreator
+  /// tahu apa yang bisa diperbaiki. Opsional, tidak mengubah status apa pun.
+  feedback    String?           @db.Text
   
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt

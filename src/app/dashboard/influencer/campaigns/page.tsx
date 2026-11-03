@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   Loader2,
   CheckCircle2,
   Clock,
+  Lightbulb,
   XCircle,
   ArrowRight,
   Sparkles,
@@ -16,13 +18,17 @@ import {
 import FeaturePage from "@/components/dashboard/FeaturePage";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getStatusMeta, isActiveStep, stageHint, statusToStep, type CollabDTO } from "@/lib/collab";
+import { getApplicationGuidance } from "@/lib/application";
 
 interface Application {
   id: string;
   proposal: string;
   proposedRate: number | null;
   status: "PENDING" | "REVIEWED" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
+  /** Catatan brand saat menolak — alasan yang bisa dipakai kreator bergerak. */
+  feedback: string | null;
   createdAt: string;
+  applicant?: { influencerProfile?: { category: string | null } | null } | null;
   campaign: {
     id: string;
     title: string;
@@ -63,11 +69,16 @@ const APP_META: Record<string, { label: string; className: string; icon: typeof 
   },
 };
 
-export default function InfluencerCampaignsPage() {
+function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
+  const [tab, setTab] = useState<"lamaran" | "kolaborasi">(
+    // Notifikasi penolakan menunjuk ke ?tab=lamaran. Tanpa ini, kreator yang
+    // mengkliknya mendarat di tab Kolaborasi — daftar yang justru tidak memuat
+    // lamarannya, jadi kesannya sistem diam.
+    initialTab === "lamaran" ? "lamaran" : "kolaborasi",
+  );
   const [applications, setApplications] = useState<Application[]>([]);
   const [collaborations, setCollaborations] = useState<CollabDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"lamaran" | "kolaborasi">("kolaborasi");
 
   const load = useCallback(async () => {
     try {
@@ -268,6 +279,14 @@ export default function InfluencerCampaignsPage() {
           {applications.map((app) => {
             const meta = APP_META[app.status] ?? APP_META.PENDING;
             const Icon = meta.icon;
+            const guidance = getApplicationGuidance({
+              status: app.status,
+              proposedRate: app.proposedRate,
+              feedback: app.feedback,
+              campaign: app.campaign,
+              applicantCategory:
+                app.applicant?.influencerProfile?.category ?? null,
+            });
             return (
               <div
                 key={app.id}
@@ -307,11 +326,70 @@ export default function InfluencerCampaignsPage() {
                     </Link>
                   )}
                 </div>
+
+                {guidance && (
+                  <div className="mt-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 p-3.5">
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                      {guidance.headline}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-1 flex items-start gap-1.5">
+                      {guidance.tone === "waiting" ? (
+                        <Clock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      )}
+                      {guidance.turn}
+                    </p>
+                    {guidance.hints.map((hint) => (
+                      <p
+                        key={hint}
+                        className="text-[11px] text-zinc-600 dark:text-zinc-300 mt-2 flex items-start gap-1.5 leading-relaxed"
+                      >
+                        <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+                        {hint}
+                      </p>
+                    ))}
+                    {guidance.actions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {guidance.actions.map((a) => (
+                          <Link
+                            key={a.to}
+                            href={a.to}
+                            title={a.why}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-influencer bg-influencer/10 hover:bg-influencer/20"
+                          >
+                            {a.label} <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
     </FeaturePage>
+  );
+}
+
+export default function InfluencerCampaignsPage() {
+  // App Router meminta boundary Suspense untuk komponen yang memakai
+  // useSearchParams. `key` membuat papan lamaran dimuat ulang saat parameter
+  // tab berubah (misalnya saat user mengklik notifikasi penolakan), jadi tab
+  // mengikuti URL tanpa perlu effect setState.
+  const params = useSearchParams();
+  const initialTab = params.get("tab");
+  return (
+    <Suspense
+      fallback={
+        <div className="py-16 flex items-center justify-center gap-2 text-sm text-zinc-400">
+          <Loader2 className="w-4 h-4 animate-spin" /> Memuat lamaran…
+        </div>
+      }
+    >
+      <ApplicationBoard key={initialTab ?? "default"} initialTab={initialTab} />
+    </Suspense>
   );
 }

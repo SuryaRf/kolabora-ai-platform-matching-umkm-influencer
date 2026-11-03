@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
+import Modal from "@/components/ui/Modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { colorForName, initialsOf } from "@/lib/avatar";
 
@@ -40,6 +41,8 @@ interface Application {
   createdAt: string;
   /** Diisi server bila lamaran ini sudah menjadi kolaborasi. */
   collaborationId?: string | null;
+  /** Catatan yang dulu dikirim brand saat menolak. */
+  feedback?: string | null;
   applicant: Applicant;
 }
 
@@ -90,6 +93,9 @@ export default function CampaignDetailClient({ id }: { id: string }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  /** Lamaran yang sedang ditolak; catatan opsional dikirim bareng ke kreator. */
+  const [rejectFor, setRejectFor] = useState<Application | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -104,24 +110,33 @@ export default function CampaignDetailClient({ id }: { id: string }) {
     void load();
   }, [load]);
 
-  const review = async (applicationId: string, action: "accept" | "reject") => {
+  const review = async (
+    applicationId: string,
+    action: "accept" | "reject",
+    note?: string,
+  ) => {
     setBusyId(applicationId);
     setError("");
     try {
       const res = await fetch("/api/applications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: applicationId, action }),
+        body: JSON.stringify({ id: applicationId, action, note: note || null }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Gagal memproses lamaran");
+        // Kalau lamaran ternyata sudah diputus (409), muat ulang supaya
+        // tombolnya hilang dan tidak bisa diklik dua kali.
+        if (res.status === 409) await load();
         return;
       }
       setNotice(
         action === "accept"
           ? "Lamaran diterima. Kolaborasi dibuat dan chat sudah aktif."
-          : "Lamaran ditolak.",
+          : note
+            ? "Lamaran ditolak. Catatan Anda ikut dikirim ke kreator."
+            : "Lamaran ditolak.",
       );
       await load();
     } catch {
@@ -129,6 +144,20 @@ export default function CampaignDetailClient({ id }: { id: string }) {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const openReject = (app: Application) => {
+    setRejectNote("");
+    setError("");
+    setNotice("");
+    setRejectFor(app);
+  };
+
+  const confirmReject = async () => {
+    if (!rejectFor) return;
+    const note = rejectNote.trim();
+    setRejectFor(null);
+    await review(rejectFor.id, "reject", note);
   };
 
   if (loading) {
@@ -292,6 +321,11 @@ export default function CampaignDetailClient({ id }: { id: string }) {
                           Penawaran tarif: {formatCurrency(app.proposedRate)}
                         </p>
                       )}
+                      {app.status === "REJECTED" && app.feedback && (
+                        <p className="text-xs text-zinc-500 mt-2">
+                          Catatan yang Anda kirim: “{app.feedback}”
+                        </p>
+                      )}
                     </div>
                     <div className="flex sm:flex-col gap-2 flex-shrink-0">
                       {app.status === "PENDING" && (
@@ -309,7 +343,7 @@ export default function CampaignDetailClient({ id }: { id: string }) {
                             Terima
                           </button>
                           <button
-                            onClick={() => void review(app.id, "reject")}
+                            onClick={() => openReject(app)}
                             disabled={busyId === app.id}
                             className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 disabled:opacity-50"
                           >
@@ -337,6 +371,62 @@ export default function CampaignDetailClient({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      <Modal
+        open={!!rejectFor}
+        onClose={() => setRejectFor(null)}
+        title="Tolak lamaran ini"
+        description={rejectFor?.applicant?.name ?? undefined}
+      >
+        {rejectFor && (
+          <div className="space-y-4">
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Lamaran untuk{" "}
+              <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                {campaign?.title}
+              </span>{" "}
+              akan ditandai belum cocok. Kreator tidak bisa melamar campaign yang
+              sama dua kali, jadi kalau ada yang sebenarnya masih bisa
+              diperbaiki, tulis catatan singkat di bawah — catatan itu yang
+              membuat perjalanan dia tidak mentok tanpa arahan.
+            </p>
+
+            <div>
+              <label className="block text-xs font-medium mb-1.5">
+                Catatan untuk kreator (opsional)
+              </label>
+              <textarea
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value.slice(0, 200))}
+                rows={3}
+                maxLength={200}
+                placeholder="Misalnya: portofolio bagus, tapi tarif di atas budget campaign ini."
+                className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-kolabora/50 resize-none"
+              />
+              <p className="text-[11px] text-zinc-400 mt-1">
+                {rejectNote.length}/200 karakter · tampil di kartu lamaran
+                kreator dan di notifikasinya
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setRejectFor(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => void confirmReject()}
+                disabled={busyId === rejectFor.id}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >
+                <XCircle className="w-3.5 h-3.5" /> Tolak Lamaran
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </FeaturePage>
   );
 }

@@ -232,6 +232,99 @@ async function main() {
     `status=${accept.json?.collaboration?.status ?? "kosong"}`,
   );
 
+  // ---- PENOLAKAN LAMARAN: harus memberi arah, bukan diam ----
+  // Dulu brand menolak dengan satu klik tanpa jejak: kreator hanya melihat chip
+  // "Ditolak", tidak ada alasan, tidak ada tombol lanjutan, dan notifikasinya
+  // menunjuk ke tab yang salah. Penjaga di bawah mengunci bentuk barunya.
+  const campReject = await umkm.request("/api/campaigns", {
+    method: "POST",
+    body: {
+      title: `SMOKE TOLAK ${new Date().toISOString().slice(11, 19)}`,
+      description:
+        "Campaign otomatis untuk uji jalur penolakan lamaran. Bukan transaksi sungguhan.",
+      category: "Kuliner",
+      budgetMin: 400000,
+      budgetMax: 600000,
+      location: "Bandung",
+      startDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      endDate: new Date(Date.now() + 12 * 86400000).toISOString().slice(0, 10),
+    },
+  });
+  check(
+    "campaign uji penolakan dibuat",
+    campReject.status === 201 && Boolean(campReject.json?.id),
+    `status=${campReject.status}`,
+  );
+  const apply2 = await kol.request("/api/campaigns/apply", {
+    method: "POST",
+    body: {
+      campaignId: campReject.json?.id,
+      proposal: "Lamaran kedua, khusus untuk menguji respons saat ditolak.",
+      proposedRate: 900000,
+    },
+  });
+  const app2Id = apply2.json?.id;
+  check(
+    "lamaran kedua terkirim",
+    [200, 201].includes(apply2.status) && Boolean(app2Id),
+    `status=${apply2.status}`,
+  );
+
+  const noteTooLong = await umkm.request("/api/applications", {
+    method: "PATCH",
+    body: { id: app2Id, action: "reject", note: "x".repeat(240) },
+  });
+  check(
+    "catatan penolakan yang kepanjangan ditolak (400, bukan 500)",
+    noteTooLong.status === 400,
+    `status=${noteTooLong.status}`,
+  );
+
+  const REJ_NOTE = "Tarifnya di atas budget campaign ini";
+  const rejected = await umkm.request("/api/applications", {
+    method: "PATCH",
+    body: { id: app2Id, action: "reject", note: REJ_NOTE },
+  });
+  check(
+    "lamaran ditolak beserta catatan brand",
+    rejected.status === 200 &&
+      rejected.json?.status === "REJECTED" &&
+      rejected.json?.feedback === REJ_NOTE,
+    `status=${rejected.status} feedback=${JSON.stringify(rejected.json?.feedback ?? null)}`,
+  );
+
+  const reopen = await umkm.request("/api/applications", {
+    method: "PATCH",
+    body: { id: app2Id, action: "accept" },
+  });
+  check(
+    "lamaran yang sudah diputus tidak bisa dibalik lagi",
+    reopen.status === 409,
+    `status=${reopen.status}`,
+  );
+
+  const kolNotif = await kol.request("/api/notifications");
+  const rejNotif = (kolNotif.json?.notifications ?? []).find((n) =>
+    String(n.message ?? "").includes(campReject.json?.title ?? ""),
+  );
+  check(
+    "notifikasi penolakan ikut membawa catatan brand",
+    Boolean(rejNotif) && String(rejNotif.message).includes(REJ_NOTE),
+    rejNotif ? rejNotif.message.slice(0, 58) : "tidak ada notif",
+  );
+  check(
+    "tautan notifikasi penolakan menuju tab Lamaran",
+    String(rejNotif?.link ?? "").includes("campaigns?tab=lamaran"),
+    `link=${rejNotif?.link ?? "-"}`,
+  );
+  const appsOfKol = await kol.request("/api/applications");
+  const row2 = (appsOfKol.json ?? []).find((a) => a.id === app2Id);
+  check(
+    "kreator bisa membaca catatan lewat daftar lamarannya",
+    row2?.feedback === REJ_NOTE && row2?.campaign?.budgetMax === 600000,
+    `feedback=${JSON.stringify(row2?.feedback ?? null)}`,
+  );
+
   const asRole = (role) => (role === "UMKM" ? umkm : kol);
   const act = (role, action, extra) =>
     asRole(role).request(`/api/collaborations/${collabId}/action`, {

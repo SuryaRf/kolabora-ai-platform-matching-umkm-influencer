@@ -22,7 +22,12 @@ interface ChatMessage {
   type: string;
   fileUrl: string | null;
   createdAt: string;
-  sender: { id: string; name: string | null; image: string | null; role: string | null };
+  sender: {
+    id: string;
+    name: string | null;
+    image: string | null;
+    role: string | null;
+  };
 }
 
 interface ChatRoomProps {
@@ -338,7 +343,9 @@ export default function ChatRoom({
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium truncate">{name}</p>
                       <span className="text-[10px] text-zinc-400 flex-shrink-0">
-                        {conv.lastMessage ? timeOf(conv.lastMessage.createdAt) : ""}
+                        {conv.lastMessage
+                          ? timeOf(conv.lastMessage.createdAt)
+                          : ""}
                       </span>
                     </div>
                     <p className="text-[11px] text-zinc-400 truncate">
@@ -354,10 +361,7 @@ export default function ChatRoom({
                       {conv.unreadCount}
                     </span>
                   )}
-                  <span
-                    className={`sr-only ${status.className}`}
-                    aria-hidden
-                  >
+                  <span className={`sr-only ${status.className}`} aria-hidden>
                     {status.label}
                   </span>
                 </button>
@@ -385,7 +389,9 @@ export default function ChatRoom({
                   )} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}
                 >
                   {initialsOf(
-                    participantLabel(other ?? { name: active.title, email: "" }),
+                    participantLabel(
+                      other ?? { name: active.title, email: "" },
+                    ),
                   )}
                 </div>
                 <div className="min-w-0">
@@ -405,7 +411,8 @@ export default function ChatRoom({
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-zinc-50/60 dark:bg-zinc-950/30">
               {loadingMessages ? (
                 <div className="flex items-center justify-center h-full text-zinc-400 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Memuat pesan...
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Memuat
+                  pesan...
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-center text-sm text-zinc-500">
@@ -426,48 +433,59 @@ export default function ChatRoom({
                           </span>
                         </div>
                       )}
-                      <div
-                        className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                      >
+                      {msg.type === "SYSTEM" ? (
+                        // Catatan tahap otomatis (mis. deal terkonfirmasi) tampil
+                        // di tengah, supaya tidak disalahartikan sebagai pesan
+                        // dari pihak lawan.
+                        <div className="flex justify-center my-1.5">
+                          <span className="max-w-[90%] text-[11px] leading-relaxed text-center text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 rounded-full whitespace-pre-wrap break-words">
+                            {msg.content}
+                          </span>
+                        </div>
+                      ) : (
                         <div
-                          className={`max-w-[85%] sm:max-w-md p-3 rounded-2xl text-sm whitespace-pre-wrap break-words ${
-                            mine
-                              ? "bg-kolabora text-white rounded-br-md"
-                              : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-bl-md"
-                          }`}
+                          className={`flex ${mine ? "justify-end" : "justify-start"}`}
                         >
-                          {msg.type === "BRIEF" && (
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide mb-1 ${
-                                mine ? "text-white/80" : "text-kolabora"
-                              }`}
-                            >
-                              <Sparkles className="w-3 h-3" /> Brief
-                            </span>
-                          )}
-                          {msg.fileUrl && (
-                            <a
-                              href={msg.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block text-xs underline mb-1"
-                            >
-                              Lampiran
-                            </a>
-                          )}
-                          <p>{msg.content}</p>
                           <div
-                            className={`flex items-center justify-end gap-1 mt-1 ${
-                              mine ? "text-white/70" : "text-zinc-400"
+                            className={`max-w-[85%] sm:max-w-md p-3 rounded-2xl text-sm whitespace-pre-wrap break-words ${
+                              mine
+                                ? "bg-kolabora text-white rounded-br-md"
+                                : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-bl-md"
                             }`}
                           >
-                            <span className="text-[10px]">
-                              {timeOf(msg.createdAt)}
-                            </span>
-                            {mine && <CheckCheck className="w-3 h-3" />}
+                            {msg.type === "BRIEF" && (
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide mb-1 ${
+                                  mine ? "text-white/80" : "text-kolabora"
+                                }`}
+                              >
+                                <Sparkles className="w-3 h-3" /> Brief
+                              </span>
+                            )}
+                            {msg.fileUrl && (
+                              <a
+                                href={msg.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block text-xs underline mb-1"
+                              >
+                                Lampiran
+                              </a>
+                            )}
+                            <p>{msg.content}</p>
+                            <div
+                              className={`flex items-center justify-end gap-1 mt-1 ${
+                                mine ? "text-white/70" : "text-zinc-400"
+                              }`}
+                            >
+                              <span className="text-[10px]">
+                                {timeOf(msg.createdAt)}
+                              </span>
+                              {mine && <CheckCheck className="w-3 h-3" />}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })

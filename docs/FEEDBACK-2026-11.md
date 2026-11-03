@@ -487,3 +487,52 @@ Di dev: dijalankan → selaras, dijalankan lagi → seluruh `UPDATE 0 / INSERT 0
 Kolaborasi itu kini: `createdAt 2026-10-26 15:18` ≤ `agreedAt 10-27` ≤ `escrowHeldAt 10-28`
 ≤ `startedAt 10-29`, `dealAmount = escrowAmount = Rp 1.500.000`, 2 konfirmasi, 2 pesan SYSTEM,
 lamaran `ACCEPTED`.
+
+## Deploy ronde 4 (4 Nov 2026, 01:04–01:20 WIB)
+
+| # | Langkah | Hasil |
+|---|---|---|
+| 0 | Cadangan DB VPS sebelum menyentuh produksi | `/root/backups/kolabora-pre-ronde4-20261103T180433Z.sql.gz` (9,6 KB) |
+| 1 | `git push origin main` (3 commit: feat penanda, fix seed, docs) | `4941be7..a0492e8` |
+| 2 | VPS: `bash scripts/deploy-vps.sh --domain kolabora.tech --port 3050 --no-caddy --skip-nginx` (tanpa `--seed`) | build + `prisma db push` (tidak ada perubahan skema) + PM2 reload; `/api/health` lokal & publik `ok:true`, `database:up` |
+| 3 | Tambalan seed di VPS: dry-run → periksa → commit | `UPDATE 1/1/1`, `INSERT 0 1`, `INSERT 0 1`, `UPDATE 1`; laporan **tester UTUH**; dijalankan ulang → seluruh `UPDATE 0 / INSERT 0` |
+| 4 | Tambalan seed di Supabase (fallback Vercel) | sama; tapi jalanan kedua sempat gagal dengan `relation "jaga_tester" already exists` — pooler 6543 memakai ulang koneksi server sehingga objek temp sesi lama masih terlihat. Skrip kukoreksi jadi `drop table if exists` sebelum `create temp table`, lalu jalanan kedua benar-benar no-op |
+| 5 | Audit 27 aturan di produksi | VPS **0 pelanggaran**; Supabase **0** kecuali aturan 26 (3 notifikasi lama 1 Nov yang menaut kolaborasi uji yang sudah dihapus — bukan dari ronde ini, belum kusentuh) |
+| 6 | Uji aksi penanda langsung ke `https://kolabora.tech` (endpoint asli) | **14/14** — 403 kreator lain, 403 brand, 200 `REVIEWED`, 409 klik ulang, notifikasi tepat satu, `REVIEWED` tetap bisa ditolak, dua halaman 200 |
+| 7 | Bersihkan jejak uji produksi (`/tmp/clean-traces.sql`, dry-run dulu) | menghapus 1 campaign + 1 lamaran + 3 notifikasi milik uji; tidak ada kolaborasi yang tersentuh |
+| 8 | Bentuk DB produksi sesudah semua langkah | 9 user / 4 campaign / 4 kolaborasi / 4 lamaran / 16 pesan / 16 notifikasi; **0 sisa jejak uji** |
+
+Baris demo di kedua basis data kini: `createdAt 2026-10-18 05:59` ≤ `agreedAt 10-19` ≤
+`escrowHeldAt 10-20` ≤ `startedAt 10-21`, `dealAmount = escrowAmount = 1.500.000`,
+2 konfirmasi, 2 pesan `SYSTEM`, dan lamaran Rizky Foodie `ACCEPTED`.
+
+Baris tester **tidak berubah**: `cmvxnqfch000nbzgcnbd5tjw0` tetap `NEGOTIATION`,
+`dealConfirmedBy = {}`, 6 pesan; `cmw0npaoq001tbzw7vx6ky0yb` tetap `NEGOTIATION`,
+`dealConfirmedBy = {}`, 1 pesan. Keduanya masih menunggu kedua sisi menekan
+"Konfirmasi Deal".
+
+## Balasan untuk tester (ronde 4)
+
+1. **Ada tombol baru di kartumu: "Tandai sudah ditinjau".** Buka *Dashboard kreator →
+   Lamaran*, pada lamaran yang masih *Menunggu Review* ada tombol itu. Fungsinya cuma
+   memberi sinyal ke brand bahwa lamaranmu masih kamu pegang — **bukan** menerima atau
+   menolak, dan **tidak** mengubah keputusan apa pun. Setelah ditekan, kartunya berubah
+   jadi "Sudah ditandai" dan brand dapat notifikasi "Pelamar menandai lamarannya" yang
+   langsung membuka halaman campaign-mu.
+2. **Sekali saja.** Menekannya dua kali ditolak ("Lamaran sudah ditandai"), dan lamaran
+   yang sudah diterima/ditolak tidak bisa ditandai lagi.
+3. **Sisi brand tidak kehilangan apa pun.** Di halaman campaign, pelamar yang menandai
+   terlihat dengan label **"Ditinjau pelamar"**, dan tombol Terima/Tolak tetap ada seperti
+   biasa. Angka "menunggu" juga tidak turun ketika pelamar menandai.
+4. **Label status sekarang seragam.** Dulu beberapa halaman menulis labelnya sendiri,
+   supaya "Ditarik" terbaca "Ditinjau". Sekarang satu sumber, dan artinya sengaja dibedakan
+   per sisi (brand: *Ditinjau pelamar* / kamu: *Sudah ditandai*) karena yang menandai memang
+   kamu, bukan brand.
+5. **Kolaborasi demo "Konten TikTok Racikan Signature" kini riwayatnya lengkap**: harga
+   deal, dua konfirmasi, dan dua catatan sistem di chat ("… sudah mengonfirmasi deal
+   Rp 1.500.000", "Deal final … dikonfirmasi kedua belah pihak"), sama seperti yang muncul
+   di jalur aslinya.
+6. **"Tarik lamaran" (`WITHDRAWN`) belum dibuat.** Statusnya masih ada di sistem, labelnya
+   sudah benar, tapi aksinya sengaja belum: perlu aturan dulu (boleh ditarik sampai tahap
+   mana, apa yang terjadi pada brand yang sudah menerima). Kalau kamu memang membutuhkannya,
+   bilang saja dan kita tentukan aturannya bareng.

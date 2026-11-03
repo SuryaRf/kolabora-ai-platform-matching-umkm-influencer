@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { getStatusMeta, statusToStep, type CollabDTO } from "@/lib/collab";
+import { getStatusMeta, isActiveStep, stageHint, statusToStep, type CollabDTO } from "@/lib/collab";
 
 interface Application {
   id: string;
@@ -86,14 +86,38 @@ export default function InfluencerCampaignsPage() {
     void load();
   }, [load]);
 
+  /**
+   * Kartu ringkasan ikut dimuat ulang saat user kembali ke tab ini. Tanpa ini
+   * angkanya masih memakai data saat halaman pertama dibuka, misalnya setelah
+   * UMKM menerima lamaran di tab lain.
+   */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
+
   const stats = useMemo(() => {
+    // Satu campaign bisa muncul dua kali untuk influencer yang sama (lamaran +
+    // kolaborasi yang lahir saat lamaran itu diterima). Jadi "Total Campaign"
+    // dihitung dari ID campaign unik, bukan penjumlahan jumlah baris.
+    const campaignKeys = new Set<string>();
+    for (const c of collaborations) campaignKeys.add(c.campaign?.id ?? c.id);
+    for (const a of applications) campaignKeys.add(a.campaign.id);
+
     const steps = collaborations.map((c) => statusToStep(c.status));
     const earnings = collaborations
       .filter((c) => c.status === "COMPLETED")
       .reduce((acc, c) => acc + (c.escrowAmount ?? c.budget), 0);
     return {
-      total: collaborations.length + applications.length,
-      berjalan: steps.filter((s) => s >= 3 && s <= 5).length,
+      total: campaignKeys.size,
+      berjalan: steps.filter(isActiveStep).length,
       menunggu: applications.filter((a) => a.status === "PENDING").length,
       selesai: steps.filter((s) => s === 6).length,
       earnings,
@@ -210,11 +234,13 @@ export default function InfluencerCampaignsPage() {
                       <Wallet className="w-3.5 h-3.5" />{" "}
                       {formatCurrency(c.budget)}
                     </span>
-                    <span>Tahap {step} dari 6</span>
+                    <span>{stageHint(c.status)}</span>
                   </div>
                   <div className="mt-3 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-influencer"
+                      className={`h-full rounded-full ${
+                        step === 0 ? "bg-zinc-300" : "bg-influencer"
+                      }`}
                       style={{ width: `${(step / 6) * 100}%` }}
                     />
                   </div>

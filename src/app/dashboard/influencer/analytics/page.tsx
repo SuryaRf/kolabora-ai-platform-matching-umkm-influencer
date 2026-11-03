@@ -14,7 +14,12 @@ import {
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { getStatusMeta, statusToStep } from "@/lib/collab";
+import {
+  getStatusMeta,
+  isActiveStep,
+  stageHint,
+  statusToStep,
+} from "@/lib/collab";
 
 export default async function InfluencerAnalyticsPage() {
   const session = await auth();
@@ -68,10 +73,8 @@ export default async function InfluencerAnalyticsPage() {
     { label: "Lamaran Diterima", count: accepted },
     {
       label: "Sedang Berjalan",
-      count: collaborations.filter((c) => {
-        const step = statusToStep(c.status);
-        return step >= 3 && step <= 5;
-      }).length,
+      count: collaborations.filter((c) => isActiveStep(statusToStep(c.status)))
+        .length,
     },
     { label: "Selesai", count: completedCount },
   ];
@@ -317,6 +320,7 @@ export default async function InfluencerAnalyticsPage() {
               const brand = c.participants.find((p) => p.role === "UMKM");
               const name = brand?.umkmProfile?.businessName || brand?.name || c.title;
               const meta = getStatusMeta(c.status, "INFLUENCER");
+              const tahap = stageHint(c.status, true);
               return (
                 <Link
                   key={c.id}
@@ -326,7 +330,8 @@ export default async function InfluencerAnalyticsPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{c.title}</p>
                     <p className="text-xs text-zinc-500 truncate">
-                      {name} • Tahap {statusToStep(c.status)}/6
+                      {name}
+                      {tahap ? ` • ${tahap}` : ""}
                     </p>
                   </div>
                   <span

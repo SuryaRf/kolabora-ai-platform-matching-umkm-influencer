@@ -19,7 +19,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { colorForName, initialsOf } from "@/lib/avatar";
-import { getStatusMeta, statusToStep } from "@/lib/collab";
+import {
+  getStatusMeta,
+  isActiveStep,
+  isWaitingStep,
+  stageHint,
+  statusToStep,
+} from "@/lib/collab";
 
 export default async function UMKMOverview() {
   const session = await auth();
@@ -68,8 +74,8 @@ export default async function UMKMOverview() {
     ]);
 
   const steps = collaborations.map((c) => statusToStep(c.status));
-  const activeCollabs = steps.filter((s) => s >= 3 && s <= 5).length;
-  const waiting = steps.filter((s) => s >= 1 && s <= 2).length;
+  const activeCollabs = steps.filter(isActiveStep).length;
+  const waiting = steps.filter(isWaitingStep).length;
   const completed = steps.filter((s) => s === 6).length;
   const spend = collaborations
     .filter((c) => c.status === "COMPLETED")
@@ -257,7 +263,7 @@ export default async function UMKMOverview() {
                   peer?.name ||
                   c.title;
                 const meta = getStatusMeta(c.status, "UMKM");
-                const step = statusToStep(c.status);
+                const tahap = stageHint(c.status, true);
                 return (
                   <Link
                     key={c.id}
@@ -274,7 +280,8 @@ export default async function UMKMOverview() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{c.title}</p>
                       <p className="text-xs text-zinc-500 truncate">
-                        {name} • Tahap {step}/6
+                        {name}
+                        {tahap ? ` • ${tahap}` : ""}
                       </p>
                     </div>
                     <span

@@ -72,6 +72,39 @@ export function statusToStep(status: CollabStatus): number {
   return STEP_BY_STATUS[status] ?? 0;
 }
 
+/**
+ * Tahap yang dihitung "sedang berjalan".
+ *
+ * Begitu kolaborasi masuk tahap diskusi (NEGOTIATION) kedua pihak sudah sama
+ * sama bergerak, jadi tidak boleh lagi dihitung sebagai "menunggu respons".
+ * DEFINISI INI DIPAKAI SEMUA HALAMAN (dashboard influencer, dashboard UMKM,
+ * riwayat, analytics, Campaign Saya) supaya angka di kartu yang sama tidak
+ * beda-beda. COMPLETED (6) dan CANCELLED (0) sengaja tidak ikut.
+ */
+export function isActiveStep(step: number): boolean {
+  return step >= 2 && step <= 5;
+}
+
+/** "Menunggu respons" = baru diajukan/diundang, belum ada diskusi. */
+export function isWaitingStep(step: number): boolean {
+  return step === 1;
+}
+
+/**
+ * Teks posisi tahap untuk kartu & daftar.
+ * CANCELLED dipetakan ke tahap 0 oleh STEP_BY_STATUS, jadi tanpa penjagaan ini
+ * baris kolaborasi yang dibatalkan menampilkan "Tahap 0 dari 6". Status itu
+ * sudah ditampilkan oleh badge "Dibatalkan", jadi stagesya tidak perlu lagi.
+ */
+export function stageHint(
+  status: CollabStatus,
+  compact = false,
+): string | null {
+  const step = statusToStep(status);
+  if (step === 0) return null;
+  return compact ? `Tahap ${step}/6` : `Tahap ${step} dari 6`;
+}
+
 const STATUS_META: Record<
   CollabStatus,
   { label: Record<Role, string>; className: string }

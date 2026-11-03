@@ -36,6 +36,8 @@ import {
   actionClassName,
   getCollabActions,
   getStatusMeta,
+  isActiveStep,
+  isWaitingStep,
   statusToStep,
   type CollabAction,
   type CollabDTO,
@@ -117,9 +119,9 @@ export default function CollaborationHistory({ role }: { role: Role }) {
         const step = statusToStep(item.status);
         switch (filter) {
           case "berjalan":
-            return step >= 3 && step <= 5;
+            return isActiveStep(step);
           case "menunggu":
-            return step >= 1 && step <= 2;
+            return isWaitingStep(step);
           case "selesai":
             return step === 6;
           default:
@@ -133,8 +135,8 @@ export default function CollaborationHistory({ role }: { role: Role }) {
     const steps = items.map((i) => statusToStep(i.status));
     return [
       { icon: History, label: "Total Kolaborasi", value: items.length, color: "bg-kolabora" },
-      { icon: Clock, label: "Sedang Berjalan", value: steps.filter((s) => s >= 3 && s <= 5).length, color: "bg-amber-500" },
-      { icon: Send, label: "Menunggu Respons", value: steps.filter((s) => s >= 1 && s <= 2).length, color: "bg-blue-500" },
+      { icon: Clock, label: "Sedang Berjalan", value: steps.filter(isActiveStep).length, color: "bg-amber-500" },
+      { icon: Send, label: "Menunggu Respons", value: steps.filter(isWaitingStep).length, color: "bg-blue-500" },
       { icon: CheckCircle2, label: "Selesai", value: steps.filter((s) => s === 6).length, color: "bg-emerald-500" },
     ];
   }, [items]);

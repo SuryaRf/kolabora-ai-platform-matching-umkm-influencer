@@ -12,7 +12,7 @@ import {
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { getStatusMeta, statusToStep } from "@/lib/collab";
+import { getStatusMeta, stageHint } from "@/lib/collab";
 
 export default async function UMKMAnalyticsPage() {
   const session = await auth();
@@ -69,7 +69,10 @@ export default async function UMKMAnalyticsPage() {
     .reduce((acc, c) => acc + (c.escrowAmount ?? c.budget), 0);
 
   const statusBuckets = [
-    { label: "Menunggu Respons", keys: ["PROPOSED", "NEGOTIATION"] },
+    // "Negosiasi" masuk bucket ini, bukan bucket berjalan, karena grafiknya
+    // memang mengelompokkan status mentah — labelnya dibuat agar tidak
+    // bertabrakan dengan kartu "Sedang Berjalan" di halaman lain.
+    { label: "Penawaran & Negosiasi", keys: ["PROPOSED", "NEGOTIATION"] },
     { label: "Escrow & Produksi", keys: ["AGREED", "ESCROW_HELD", "IN_PRODUCTION"] },
     {
       label: "Review Konten",
@@ -303,6 +306,7 @@ export default async function UMKMAnalyticsPage() {
                 peer?.name ||
                 c.title;
               const meta = getStatusMeta(c.status, "UMKM");
+              const tahap = stageHint(c.status, true);
               return (
                 <Link
                   key={c.id}
@@ -312,7 +316,8 @@ export default async function UMKMAnalyticsPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{c.title}</p>
                     <p className="text-xs text-zinc-500 truncate">
-                      {name} • Tahap {statusToStep(c.status)}/6
+                      {name}
+                      {tahap ? ` • ${tahap}` : ""}
                     </p>
                   </div>
                   <span

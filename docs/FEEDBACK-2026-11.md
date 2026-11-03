@@ -404,3 +404,86 @@ pernah ditulis** oleh alur mana pun — tidak ada tombol "Tandai sudah ditinjau"
 lamaran". Keduanya dibiarkan ada di sistem (data lama tidak diapa-apakan) dan kartu dengan
 status itu tetap diberi bimbingan yang benar, tapi sampai ada permintaan nyata lebih baik
 tidak dibuat.
+
+# Ronde 4 (4 Nov 2026) — penanda "sudah ditinjau" oleh pelamar + seed yang diselaraskan
+
+Dua hal yang ditahan ronde 3 akhirnya diminta: status `REVIEWED` dihidupkan lewat aksi
+nyata, dan baris seed yang melanggar invarian dibenahi.
+
+## Yang diminta dan yang dipilih
+
+| Permintaan | Pilihan | Alasan |
+|---|---|---|
+| `REVIEWED` tidak pernah ditulis | tombol **"Tandai sudah ditinjau"** di kartu lamaran sisi **kreator** | keluhan ronde 3 adalah "tahap ini diam"; yang menunggu dan ingin tahu kondisi lamaran itu pelamar, bukan brand |
+| `WITHDRAWN` juga tak pernah ditulis | **belum** | butuh aturan baru (boleh ditarik sampai kapan? apa dampak ke kartu yang sudah menerima?) — menunggu Permintaan 1 versi jelas |
+| Baris seed melanggar invarian | **selaraskan `prisma/seed.mjs` + tambal baris live** | data demo yang tidak memenuhi aturan sendiri lebih membingungkan daripada kosong |
+
+## Makna aksi (dan batasnya)
+
+`PENDING → REVIEWED` adalah **penanda, bukan keputusan**. Kepemilikannya milik pelamar:
+hanya `applicantId` sendiri yang boleh (brand maupun kreator lain → **403**). Setelah
+ditandai, brand tetap bisa menerima/menolak — itu dijaga `DECIDABLE = ["PENDING","REVIEWED"]`
+di `PATCH /api/applications`. Klik ulang → **409** "Lamaran sudah ditandai", dan penulisannya
+`updateMany({ where: { id, status: "PENDING" } })` supaya dua tab tidak menghasilkan dua
+notifikasi.
+
+## Konsekuensi yang ternyata menyentuh seluruh dashboard
+
+Menambah status baru = menelusuri setiap tempat yang memperlakukan `PENDING` sebagai
+"belum diputus". Yang ditemukan dan dibenahi:
+
+1. **Brand bisa kehilangan tombol keputusannya sendiri.** `CampaignDetailClient` hanya
+   merender Terima/Tolak untuk `PENDING` — begitu pelamar menandai, kartu itu tidak punya
+   aksi sama sekali. Kini pakai `isUndecided(status)`.
+2. **Angka "menunggu" ikut turun tiap ada yang menandai.** Diperbaiki di tiga tempat:
+   tab Lamaran kreator, kartu ringkasan dashboard kreator, dan `applications.pending` pada
+   `GET /api/insights/umkm` (dipakai halaman *Pelamar menunggu* di Smart Calendar). Semua
+   lewat `UNDECIDED`/`isUndecided` yang sama. Funnel Priority Matching sudah memisahkan
+   `pending`/`reviewed` di `lib/facts.ts`, jadi teksnya kukoraksikan: "N menunggu (M ditandai
+   ditinjau)".
+3. **Empat halaman mengarang labelnya sendiri.** `src/app/dashboard/influencer/page.tsx`,
+   `umkm/page.tsx`, `influencer/analytics/page.tsx`, dan `CampaignDetailClient.tsx` memakai
+   ternary kelas+label yang beda-beda, dengan cabang fallback `"Ditinjau"` — sehingga
+   `WITHDRAWN` terbaca "Ditinjau" dan `REVIEWED` bisa berarti dua hal tergantung halaman.
+   Sekarang satu sumber: `applicationChip(status, "brand" | "kreator")` di
+   `src/lib/application.ts`. Labelnya memang sengaja berbeda per sisi karena subjeknya
+   berbeda: brand melihat **"Ditinjau pelamar"**, kreator melihat **"Sudah ditandai"**.
+4. Tab Lamaran kreator tinggal menyimpan **ikon** (`APP_ICON`), label/warna dari helper.
+
+## Verifikasi lokal (sebelum deploy)
+
+| Suite | Hasil |
+|---|---|
+| `tsc --noEmit`, `eslint src scripts prisma`, `next build` | bersih |
+| Uji aksi end-to-end (`/tmp/review-action-test.mjs`, build produksi + `kolabora_dev`) | **14/14** — 403 kreator lain, 403 brand, 200 `REVIEWED`, 409 klik ulang, brand melihat penandanya, tepat satu notifikasi dengan tautan campaign yang benar, `REVIEWED` tetap bisa ditolak, 409 setelah diputus, dua halaman tetap 200 |
+| Perjalanan penuh `/tmp/journey-sim.mjs` | **132/132** (blok `[B3]` baru: 12 pemeriksaan aksi penanda + penjagaannya) |
+| `scripts/smoke-test.mjs` | **120/120** (blok "PENANDA SUDAH DITINJAU": 10 pemeriksaan, termasuk note >240 karakter → 400) |
+| `/tmp/collab-harness.mjs` / `/tmp/deal-sync.mjs` / `/tmp/lifecycle-sim.mjs` | 189/189 · 20/20 · 32/32 |
+| Seed di DB kosong (`kolabora_seedtest`) | **27 aturan / 0 pelanggaran** |
+| `kolabora_dev` sesudah tambalan + bersih dari jejak uji | **27 aturan / 0 pelanggaran**, bentuk 4 user / 4 campaign / 3 kolaborasi / 3 lamaran / 10 pesan / 4 notif |
+
+Dua hal yang kutemukan dari alatku sendiri, bukan dari aplikasimu:
+- aturan 2/6/7 audit "lolos" karena hasilnya `NULL`, bukan `0` — kini semua perbandingan
+  ber-`coalesce()`, dan kutambah aturan 22 (lamaran belum diputus tidak berdampingan dengan
+  kartu terbuka yang sama), 25 (tautan notifikasi campaign harus menunjuk campaign yang ada),
+  27 (`ACCEPTED` harus didukung kolaborasi);
+- penyaring notifikasi di smoke/journey hanya mencocokkan **judul**, sehingga gagal saat ada
+  run lain meninggalkan notifikasi serupa untuk brand yang sama — disempitkan lewat `link`.
+
+## Menambal baris live (bukan hanya seed)
+
+`/tmp/fix-seed-row.sql` (dev/VPS/Supabase, satu file yang sama): `dealAmount = budget`,
+`dealConfirmedBy` = kedua peserta, `createdAt` diturunkan satu hari sebelum jejak deal
+pertama, dua pesan `SYSTEM` riwayat deal, dan lamaran kreator di campaign itu
+`PENDING → ACCEPTED`. Semua langkah **berpenjaga dan idempoten** — basis waktu dihitung dari
+jejak deal saja (`min(agreedAt, escrowHeldAt, startedAt, submittedAt)`), tanpa `createdAt`,
+sehingga dijalankan ulang tidak menggeser tanggal lagi (versi pertama melakukan itu,
+tertangkap oleh jalankan-dua-kali). Empat penjaga: baris target harus tunggal &
+`IN_PRODUCTION`; pesertanya harus 1 brand + 1 kreator; baris tester (`cmvxnqfch…`,
+`cmw0npaoq…`) difoto sebelum dan sesudah dan transaksi dibatalkan bila berubah; dan tidak
+ada `Message` duplikat (`not exists … like '%sudah mengonfirmasi deal%'`).
+Di dev: dijalankan → selaras, dijalankan lagi → seluruh `UPDATE 0 / INSERT 0`.
+
+Kolaborasi itu kini: `createdAt 2026-10-26 15:18` ≤ `agreedAt 10-27` ≤ `escrowHeldAt 10-28`
+≤ `startedAt 10-29`, `dealAmount = escrowAmount = Rp 1.500.000`, 2 konfirmasi, 2 pesan SYSTEM,
+lamaran `ACCEPTED`.

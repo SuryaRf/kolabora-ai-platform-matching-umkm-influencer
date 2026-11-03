@@ -226,3 +226,21 @@ Baris demo untuk klik-manual dibuat di **DB dev lokal** saja (`kolabora_dev`):
 `foodie@kolabora.id`, tarif lamaran Rp 750.000, 2 chat penawaran, nol konfirmasi
 sehingga kedua tombol aktif. Tidak ada baris demo yang dibuat di produksi.
 
+## Tindakan atas data tester (3 Nov 2026, 19:20 WIB — atas persetujuan)
+
+Lamaran `ARTIZ@gmail.com` (`cmvxnpxn4000jbzgcey37p0n5`) yang sebelumnya **REJECTED**
+dibuka kembali lewat **endpoint asli** `PATCH /api/applications` sebagai pemilik
+campaign (`brand@kolabora.id`), bukan lewat UPDATE manual, supaya efeknya identik
+dengan brand yang menekan "Terima":
+
+- aplikasi → `ACCEPTED`
+- kolaborasi baru `cmw0npaoq001tbzw7vx6ky0yb` — `NEGOTIATION`, budget **Rp 1.000.000**
+  (= `proposedRate` lamaran, bukan angka campaign), peserta brand + ARTIZ
+- 1 pesan `SYSTEM` di chat ("Selamat! Lamaran Anda … diterima")
+- 1 notifikasi `APPLICATION` "Lamaran diterima" untuk ARTIZ
+- `dealConfirmedBy = {}` → kedua sisi memang harus menekan "Konfirmasi Deal"
+
+Kolaborasi `cmvxnqfch000nbzgcnbd5tjw0` (Rp 500.000) tetap tidak berubah. Audit
+invarian sesudahnya: 0 pelanggaran. Bentuk DB: 9 user / 4 campaign / 4 kolaborasi /
+4 lamaran / 14 pesan / 16 notifikasi.
+

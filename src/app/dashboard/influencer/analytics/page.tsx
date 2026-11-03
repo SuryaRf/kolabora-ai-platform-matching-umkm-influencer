@@ -14,6 +14,7 @@ import {
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { applicationChip } from "@/lib/application";
 import {
   getStatusMeta,
   isActiveStep,
@@ -279,22 +280,10 @@ export default async function InfluencerAnalyticsPage() {
                     <td className="px-5 py-3">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          a.status === "PENDING"
-                            ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                            : a.status === "ACCEPTED"
-                              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                              : a.status === "REJECTED"
-                                ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                          applicationChip(a.status, "kreator").className
                         }`}
                       >
-                        {a.status === "PENDING"
-                          ? "Menunggu"
-                          : a.status === "ACCEPTED"
-                            ? "Diterima"
-                            : a.status === "REJECTED"
-                              ? "Ditolak"
-                              : "Ditinjau"}
+                        {applicationChip(a.status, "kreator").label}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-zinc-500">

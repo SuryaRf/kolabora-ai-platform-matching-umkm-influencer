@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/ai-route";
+import { UNDECIDED } from "@/lib/application";
 
 export const runtime = "nodejs";
 
@@ -187,8 +188,15 @@ async function handle() {
 
   /* ------------------------------------------------------------- agregat */
   const totalApplications = campaigns.reduce((sum, c) => sum + c._count.applications, 0);
+  // "Menunggu" di sini = belum diputus brand. Lamaran yang ditandai REVIEWED
+  // oleh pelamarnya tetap dihitung: penanda itu bukan keputusan, hanya sinyal
+  // bahwa lamarannya masih dipegang. Kalau tidak ikut dihitung, angka brand
+  // justru turun setiap kali pelamar menekan tombol itu.
   const pendingApplications = await prisma.application.count({
-    where: { campaign: { ownerId: userId }, status: "PENDING" },
+    where: {
+      campaign: { ownerId: userId },
+      status: { in: [...UNDECIDED] },
+    },
   });
   const held = collaborations.filter((k) => k.escrowStatus === "HELD");
   const released = collaborations.filter((k) => k.escrowStatus === "RELEASED");

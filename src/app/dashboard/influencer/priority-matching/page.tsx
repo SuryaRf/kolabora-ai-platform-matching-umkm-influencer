@@ -171,7 +171,9 @@ export default function PriorityMatching() {
           <h3 className="font-semibold text-sm mb-4">Data kamu saat ini</h3>
           <div className="space-y-3">
             {[
-              { label: "Lamaran dikirim", value: `${data.funnel.total}`, hint: `${data.funnel.pending} menunggu, ${data.funnel.rejected} ditolak` },
+              // REVIEWED tetap "menunggu" di sisi kreator: penandanya dari dia
+              // sendiri, keputusannya masih di brand.
+              { label: "Lamaran dikirim", value: `${data.funnel.total}`, hint: `${data.funnel.pending + data.funnel.reviewed} menunggu${data.funnel.reviewed ? ` (${data.funnel.reviewed} ditandai ditinjau)` : ""}, ${data.funnel.rejected} ditolak` },
               { label: "Lamaran diterima", value: `${data.funnel.accepted}`, hint: `${data.collaborations.total} kolaborasi tercipta` },
               { label: "Kolaborasi berjalan", value: `${data.collaborations.active}`, hint: `${data.collaborations.completed} sudah selesai` },
               { label: "Konten disetujui", value: `${data.approvedContents}`, hint: "review yang berstatus APPROVED" },

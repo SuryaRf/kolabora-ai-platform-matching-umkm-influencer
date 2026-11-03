@@ -22,7 +22,8 @@ const DECIDABLE = ["PENDING", "REVIEWED"] as const;
 
 const decideSchema = z.object({
   id: z.string().min(1),
-  action: z.enum(["accept", "reject"]),
+  // "review" milik pelamar (kreator), "accept"/"reject" milik brand.
+  action: z.enum(["accept", "reject", "review"]),
   // Catatan opsional saat menolak, supaya kreator tahu apa yang bisa diperbaiki.
   // Dibatasi pendek: ini arahan, bukan ruang curhat.
   note: z
@@ -83,10 +84,6 @@ export async function PATCH(req: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (session.user.role !== "UMKM") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json().catch(() => ({}));
     const parsed = decideSchema.safeParse(body);
     if (!parsed.success) {
@@ -105,7 +102,64 @@ export async function PATCH(req: Request) {
       },
     });
 
-    if (!application || application.campaign.ownerId !== session.user.id) {
+    if (!application) {
+      return NextResponse.json(
+        { error: "Lamaran tidak ditemukan" },
+        { status: 404 },
+      );
+    }
+
+    // --- AKSI MILIK PELAMAR: "sudah saya tinjau" -------------------------
+    // Lamaran yang mengambang tanpa sinyal dari pelamarnya bikin brand tidak
+    // tahu apakah orang itu masih serius. Penanda ini bukan keputusan: brand
+    // tetap yang menerima/menolak, dan lamaran yang sudah ditandai masih bisa
+    // diputus seperti biasa.
+    if (action === "review") {
+      if (application.applicantId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Hanya pemilik lamaran yang bisa menandainya" },
+          { status: 403 },
+        );
+      }
+      if (application.status !== "PENDING") {
+        return NextResponse.json(
+          {
+            error:
+              application.status === "REVIEWED"
+                ? "Lamaran sudah ditandai"
+                : "Lamaran ini sudah diputus sebelumnya",
+          },
+          { status: 409 },
+        );
+      }
+      const marked = await prisma.application.updateMany({
+        where: { id, status: "PENDING" },
+        data: { status: "REVIEWED" },
+      });
+      if (marked.count === 0) {
+        return NextResponse.json(
+          { error: "Lamaran sudah ditandai, muat ulang halaman" },
+          { status: 409 },
+        );
+      }
+      const afterMark = await prisma.application.findUniqueOrThrow({
+        where: { id },
+      });
+      await notify(
+        application.campaign.ownerId,
+        "APPLICATION",
+        "Pelamar menandai lamarannya",
+        `${application.applicant.name} menandai lamarannya untuk "${application.campaign.title}" sebagai sudah ditinjau — ia masih menunggu keputusan Anda.`,
+        `/dashboard/umkm/campaigns/${application.campaignId}`,
+      );
+      return NextResponse.json(afterMark);
+    }
+
+    // --- Aksi milik brand --------------------------------------------------
+    if (session.user.role !== "UMKM") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (application.campaign.ownerId !== session.user.id) {
       return NextResponse.json(
         { error: "Lamaran tidak ditemukan" },
         { status: 404 },

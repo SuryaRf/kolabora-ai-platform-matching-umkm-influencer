@@ -27,6 +27,67 @@ export type ApplicationState =
   | "REJECTED"
   | "WITHDRAWN";
 
+/**
+ * Status yang masih menunggu keputusan brand. `REVIEWED` diisi oleh PELAMAR
+ * (tombol "Tandai sudah ditinjau" di kartunya), jadi bukan keputusan: ia tetap
+ * dihitung sebagai "menunggu" di semua angka dan tetap bisa diterima/ditolak.
+ * Tanpa daftar ini, menandai lamaran justru membuat brand kehilangan tombolnya.
+ */
+export const UNDECIDED: readonly ApplicationState[] = ["PENDING", "REVIEWED"];
+
+export function isUndecided(status: string): boolean {
+  return (UNDECIDED as readonly string[]).includes(status);
+}
+
+type Tone = "waiting" | "seen" | "success" | "danger" | "muted";
+
+const TONE_CLASS: Record<Tone, string> = {
+  waiting: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+  seen: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
+  success:
+    "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
+  danger: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+  muted: "bg-zinc-100 dark:bg-zinc-800 text-zinc-500",
+};
+
+const TONE: Record<ApplicationState, Tone> = {
+  PENDING: "waiting",
+  REVIEWED: "seen",
+  ACCEPTED: "success",
+  REJECTED: "danger",
+  WITHDRAWN: "muted",
+};
+
+/**
+ * Label chip per status, dibedakan menurut sisi yang melihat: "Ditinjau pelamar"
+ * (brand) dan "Sudah ditandai" (kreator) adalah peristiwa yang sama, tapi
+ * subjeknya berbeda — dan itu justru inti dari penanda ini.
+ */
+const LABEL: Record<ApplicationState, { brand: string; kreator: string }> = {
+  PENDING: { brand: "Menunggu", kreator: "Menunggu Review" },
+  REVIEWED: { brand: "Ditinjau pelamar", kreator: "Sudah ditandai" },
+  ACCEPTED: { brand: "Diterima", kreator: "Diterima" },
+  REJECTED: { brand: "Ditolak", kreator: "Ditolak" },
+  WITHDRAWN: { brand: "Ditarik", kreator: "Ditarik" },
+};
+
+/**
+ * Satu sumber untuk chip status lamaran. Sebelum ini, label "Ditinjau" muncul
+ * lewat cabang fallback di empat halaman — sehingga `WITHDRAWN` ikut terbaca
+ * "Ditinjau" dan `REVIEWED` bisa berarti dua hal tergantung halaman.
+ */
+export function applicationChip(
+  status: string,
+  side: "brand" | "kreator" = "brand",
+): { label: string; className: string } {
+  const key = (Object.keys(LABEL) as ApplicationState[]).includes(
+    status as ApplicationState,
+  )
+    ? (status as ApplicationState)
+    : "PENDING";
+  return { label: LABEL[key][side], className: TONE_CLASS[TONE[key]] };
+}
+
 export interface ApplicationLike {
   status: ApplicationState;
   proposedRate: number | null;
@@ -136,7 +197,7 @@ export function getApplicationGuidance(
         headline:
           app.status === "PENDING"
             ? "Lamaran terkirim, menunggu keputusan brand"
-            : "Brand sudah membuka lamaran Anda",
+            : "Sudah Anda tandai sebagai ditinjau — keputusan tetap di brand",
         turn: "Giliran brand: meninjau dan memutuskan",
         tone: "waiting",
         hints: rateHints(app),

@@ -8,17 +8,21 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
+  Eye,
   Lightbulb,
   XCircle,
   ArrowRight,
-  Sparkles,
   Wallet,
   Search,
 } from "lucide-react";
 import FeaturePage from "@/components/dashboard/FeaturePage";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getStatusMeta, isActiveStep, stageHint, statusToStep, type CollabDTO } from "@/lib/collab";
-import { getApplicationGuidance } from "@/lib/application";
+import {
+  applicationChip,
+  getApplicationGuidance,
+  isUndecided,
+} from "@/lib/application";
 
 interface Application {
   id: string;
@@ -39,34 +43,17 @@ interface Application {
   };
 }
 
-const APP_META: Record<string, { label: string; className: string; icon: typeof Clock }> = {
-  PENDING: {
-    label: "Menunggu Review",
-    className:
-      "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-    icon: Clock,
-  },
-  ACCEPTED: {
-    label: "Diterima",
-    className:
-      "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
-    icon: CheckCircle2,
-  },
-  REJECTED: {
-    label: "Ditolak",
-    className: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-    icon: XCircle,
-  },
-  REVIEWED: {
-    label: "Ditinjau",
-    className: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
-    icon: Sparkles,
-  },
-  WITHDRAWN: {
-    label: "Ditarik",
-    className: "bg-zinc-100 dark:bg-zinc-800 text-zinc-500",
-    icon: XCircle,
-  },
+/**
+ * Ikon status. Label dan warnanya tidak diulang di sini — lihat
+ * applicationChip() di lib/application supaya keempat halaman berbahasa yang
+ * sama untuk status yang sama.
+ */
+const APP_ICON: Record<string, typeof Clock> = {
+  PENDING: Clock,
+  REVIEWED: Eye,
+  ACCEPTED: CheckCircle2,
+  REJECTED: XCircle,
+  WITHDRAWN: XCircle,
 };
 
 function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
@@ -79,6 +66,10 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [collaborations, setCollaborations] = useState<CollabDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingId, setMarkingId] = useState<string | null>(null);
+  const [markNote, setMarkNote] = useState<{ id: string; text: string } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +83,46 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
       setLoading(false);
     }
   }, []);
+
+  /**
+   * Pelamar menandai lamarannya sebagai sudah ditinjau (PENDING -> REVIEWED).
+   * Bukan keputusan: brand tetap yang menerima/menolak, jadi aksinya sengaja
+   * ada di sisi kreator dan hanya bisa dipakai sekali per lamaran.
+   */
+  const markReviewed = async (id: string) => {
+    setMarkingId(id);
+    setMarkNote(null);
+    try {
+      const res = await fetch("/api/applications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "review" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        // Ada yang memindahkan duluan: tab lain, atau brand memutus lamarannya.
+        setMarkNote({
+          id,
+          text: json.error ?? "Lamaran sudah berubah, halaman dimuat ulang.",
+        });
+        void load();
+        return;
+      }
+      if (!res.ok) {
+        setMarkNote({ id, text: json.error ?? "Gagal menandai lamaran." });
+        return;
+      }
+      setMarkNote({
+        id,
+        text: "Lamaran ditandai. Brand melihat penanda ini di daftar pelamar.",
+      });
+      void load();
+    } catch {
+      setMarkNote({ id, text: "Koneksi terputus. Penanda belum terkirim." });
+    } finally {
+      setMarkingId(null);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -129,7 +160,9 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
     return {
       total: campaignKeys.size,
       berjalan: steps.filter(isActiveStep).length,
-      menunggu: applications.filter((a) => a.status === "PENDING").length,
+      // "Menunggu" = belum diputus brand, termasuk yang sudah ditandai
+      // pelamar sebagai ditinjau — kalau tidak, menandai justru mengurangi angka.
+      menunggu: applications.filter((a) => isUndecided(a.status)).length,
       selesai: steps.filter((s) => s === 6).length,
       earnings,
     };
@@ -277,8 +310,8 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
       ) : (
         <div className="space-y-3">
           {applications.map((app) => {
-            const meta = APP_META[app.status] ?? APP_META.PENDING;
-            const Icon = meta.icon;
+            const chip = applicationChip(app.status, "kreator");
+            const Icon = APP_ICON[app.status] ?? Clock;
             const guidance = getApplicationGuidance({
               status: app.status,
               proposedRate: app.proposedRate,
@@ -297,9 +330,9 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{app.campaign.title}</p>
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${meta.className}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${chip.className}`}
                       >
-                        <Icon className="w-3 h-3" /> {meta.label}
+                        <Icon className="w-3 h-3" /> {chip.label}
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500">
@@ -349,8 +382,26 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
                         {hint}
                       </p>
                     ))}
-                    {guidance.actions.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
+                    {guidance.actions.length > 0 || app.status === "PENDING" ? (
+                      <div className="flex flex-wrap gap-2 mt-3 items-center">
+                        {/* Penanda dari pelamar: bukan keputusan, hanya sinyal
+                            bahwa lamarannya masih dipegang dan masih serius. */}
+                        {app.status === "PENDING" && (
+                          <button
+                            type="button"
+                            onClick={() => void markReviewed(app.id)}
+                            disabled={markingId === app.id}
+                            title="Kabar ke brand bahwa lamaran ini masih Anda pegang"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-influencer hover:bg-influencer-dark disabled:opacity-60"
+                          >
+                            {markingId === app.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Eye className="w-3 h-3" />
+                            )}
+                            Tandai sudah ditinjau
+                          </button>
+                        )}
                         {guidance.actions.map((a) => (
                           <Link
                             key={a.to}
@@ -362,6 +413,11 @@ function ApplicationBoard({ initialTab }: { initialTab: string | null }) {
                           </Link>
                         ))}
                       </div>
+                    ) : null}
+                    {markNote?.id === app.id && (
+                      <p className="text-[11px] text-zinc-500 mt-2">
+                        {markNote.text}
+                      </p>
                     )}
                   </div>
                 )}

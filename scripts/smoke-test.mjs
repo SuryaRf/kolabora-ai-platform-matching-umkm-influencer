@@ -325,6 +325,131 @@ async function main() {
     `feedback=${JSON.stringify(row2?.feedback ?? null)}`,
   );
 
+  // ---- PENANDA "SUDAH DITINJAU" MILIK PELAMAR ----
+  // Brand tidak pernah tahu apakah pelamar masih memegang lamarannya (kreator
+  // mengeluh tahap ini "diam" di arah sebaliknya). Penanda PENDING -> REVIEWED
+  // sengaja BUKAN keputusan: brand tetap yang menerima/menolak sesudahnya.
+  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const campReview = await umkm.request("/api/campaigns", {
+    method: "POST",
+    body: {
+      title: `SMOKE REVIEW ${new Date().toISOString().slice(11, 19)}`,
+      description: "Campaign otomatis untuk uji penanda tinjauan pelamar.",
+      category: "Kuliner",
+      budgetMin: 500000,
+      budgetMax: 900000,
+      location: "Solo",
+      startDate: day(1),
+      endDate: day(12),
+    },
+  });
+  const applyReview = await kol.request("/api/campaigns/apply", {
+    method: "POST",
+    body: {
+      campaignId: campReview.json?.id,
+      proposal: "Uji otomatis: penanda sudah ditinjau oleh pelamar.",
+      proposedRate: 700000,
+    },
+  });
+  const reviewAppId = applyReview.json?.id;
+  check(
+    "lamaran untuk uji penanda terkirim",
+    [200, 201].includes(applyReview.status) && Boolean(reviewAppId),
+    `status=${applyReview.status}`,
+  );
+
+  const foreignMark = await umkm.request("/api/applications", {
+    method: "PATCH",
+    body: { id: reviewAppId, action: "review" },
+  });
+  check(
+    "hanya pemilik lamaran yang bisa menandainya (bukan brand)",
+    foreignMark.status === 403,
+    `status=${foreignMark.status} ${String(foreignMark.json?.error ?? "")}`,
+  );
+
+  const marked = await kol.request("/api/applications", {
+    method: "PATCH",
+    body: { id: reviewAppId, action: "review" },
+  });
+  check(
+    "pelamar menandai lamarannya (PENDING -> REVIEWED)",
+    marked.status === 200 && marked.json?.status === "REVIEWED",
+    `status=${marked.status} ${marked.json?.status ?? ""}`,
+  );
+
+  const markAgain = await kol.request("/api/applications", {
+    method: "PATCH",
+    body: { id: reviewAppId, action: "review" },
+  });
+  check(
+    "menandai dua kali ditolak (409), tidak dobel notifikasi",
+    markAgain.status === 409 && /sudah ditandai/i.test(String(markAgain.json?.error)),
+    `status=${markAgain.status} ${String(markAgain.json?.error ?? "")}`,
+  );
+
+  const markRejected = await kol.request("/api/applications", {
+    method: "PATCH",
+    body: { id: app2Id, action: "review" },
+  });
+  check(
+    "lamaran yang sudah diputus tidak bisa ditandai lagi",
+    markRejected.status === 409 && /diputus/i.test(String(markRejected.json?.error)),
+    `status=${markRejected.status} ${String(markRejected.json?.error ?? "")}`,
+  );
+
+  const reviewDetail = await umkm.request(
+    `/api/campaigns/${campReview.json?.id}`,
+  );
+  const seenRow = (reviewDetail.json?.applications ?? []).find(
+    (a) => a.id === reviewAppId,
+  );
+  check(
+    "brand melihat penanda itu di daftar pelamarnya",
+    seenRow?.status === "REVIEWED",
+    `status=${seenRow?.status ?? "tidak terlihat"}`,
+  );
+
+  const brandNotif = await umkm.request("/api/notifications");
+  // Disaring lewat link, bukan hanya judul: naskah lain (perjalanan penuh) boleh
+  // saja meninggalkan notifikasi serupa untuk brand yang sama di run sebelumnya.
+  const markNotifs = (brandNotif.json?.notifications ?? []).filter(
+    (n) =>
+      String(n.title ?? "").includes("Pelamar menandai") &&
+      String(n.link ?? "").includes(String(campReview.json?.id)),
+  );
+  check(
+    "brand dapat satu notifikasi penanda (tidak dobel saat klik ulang)",
+    markNotifs.length === 1,
+    `jumlah=${markNotifs.length}`,
+  );
+  check(
+    "tautan notifikasi penanda menuju halaman campaign yang benar",
+    String(markNotifs[0]?.link ?? "").includes(
+      `/dashboard/umkm/campaigns/${campReview.json?.id}`,
+    ),
+    `link=${markNotifs[0]?.link ?? "-"}`,
+  );
+
+  const rejectAfterMark = await umkm.request("/api/applications", {
+    method: "PATCH",
+    body: { id: reviewAppId, action: "reject", note: "Ditolak setelah ditandai" },
+  });
+  check(
+    "penanda tidak merampas keputusan brand: setelah REVIEWED tetap bisa ditolak",
+    rejectAfterMark.status === 200 && rejectAfterMark.json?.status === "REJECTED",
+    `status=${rejectAfterMark.status} ${rejectAfterMark.json?.status ?? ""}`,
+  );
+
+  const kolMarkPage = await kol.request(
+    "/dashboard/influencer/campaigns?tab=lamaran",
+  );
+  check(
+    "halaman lamaran kreator tetap terbuka setelah ditandai",
+    kolMarkPage.status === 200,
+    `status=${kolMarkPage.status}`,
+  );
+
   // ---- KUNCI DUPLIKASI: satu pekerjaan = satu kartu ----
   // Audit menemukan brand bisa membuat kolaborasi kembar lewat jalur undangan
   // (jalur unggulan dan halaman Highlights), padahal jalur terima-lamaran menguncinya.

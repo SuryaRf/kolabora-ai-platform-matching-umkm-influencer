@@ -17,6 +17,7 @@ import FeaturePage from "@/components/dashboard/FeaturePage";
 import Modal from "@/components/ui/Modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { colorForName, initialsOf } from "@/lib/avatar";
+import { applicationChip, isUndecided } from "@/lib/application";
 
 interface Applicant {
   id: string;
@@ -62,30 +63,6 @@ interface CampaignDetail {
   applications: Application[];
 }
 
-const APP_STATUS: Record<string, { label: string; className: string }> = {
-  PENDING: {
-    label: "Menunggu",
-    className:
-      "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-  },
-  ACCEPTED: {
-    label: "Diterima",
-    className:
-      "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
-  },
-  REJECTED: {
-    label: "Ditolak",
-    className: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-  },
-  REVIEWED: {
-    label: "Ditinjau",
-    className: "bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400",
-  },
-  WITHDRAWN: {
-    label: "Ditarik",
-    className: "bg-zinc-100 dark:bg-zinc-800 text-zinc-500",
-  },
-};
 
 export default function CampaignDetailClient({ id }: { id: string }) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
@@ -275,7 +252,9 @@ export default function CampaignDetailClient({ id }: { id: string }) {
                 profile?.displayName ||
                 app.applicant.name ||
                 app.applicant.email;
-              const meta = APP_STATUS[app.status] ?? APP_STATUS.PENDING;
+              // Label & warna chip satu sumber dengan halaman lain: penanda
+              // dari pelamar terbaca "Ditinjau pelamar" di sisi brand.
+              const meta = applicationChip(app.status, "brand");
               return (
                 <div
                   key={app.id}
@@ -328,7 +307,7 @@ export default function CampaignDetailClient({ id }: { id: string }) {
                       )}
                     </div>
                     <div className="flex sm:flex-col gap-2 flex-shrink-0">
-                      {app.status === "PENDING" && (
+                      {isUndecided(app.status) && (
                         <>
                           <button
                             onClick={() => void review(app.id, "accept")}

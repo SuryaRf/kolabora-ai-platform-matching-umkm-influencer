@@ -1,7 +1,9 @@
 # Feedback tester 1–3 Nov 2026 — temuan, perbaikan, dan verifikasi
 
-Status: **semua poin sudah live di `https://kolabora.tech`** (deploy 3 Nov 2026,
-commit `3afbe28`..`e920c94`, smoke 85/85 terhadap URL produksi).
+Status: **semua poin sudah live di `https://kolabora.tech`** — ronde 1–2 (deploy 3 Nov,
+commit `3afbe28`..`e920c94`, smoke 85/85) dan **ronde 3** (deploy 3 Nov malam, commit
+`e75b45c` + `a8e50d1`: jalur penolakan lamaran + catatan brand + kunci duplikasi
+kolaborasi; perjalanan penuh 120/120 dan smoke 110/110 terhadap URL produksi).
 
 ## Ringkasan keputusan
 
@@ -244,3 +246,161 @@ Kolaborasi `cmvxnqfch000nbzgcnbd5tjw0` (Rp 500.000) tetap tidak berubah. Audit
 invarian sesudahnya: 0 pelanggaran. Bentuk DB: 9 user / 4 campaign / 4 kolaborasi /
 4 lamaran / 14 pesan / 16 notifikasi.
 
+
+## Ronde 3 — jalur "lamaran ditolak" dan kunci duplikasi (3 Nov 2026, malam)
+
+Permintaan tester yang tersisa dari ronde 2: *"tahap ditolak itu diam"*. Diuji
+lewat perjalanan penuh (AI Smart Matching → pencairan) terhadap build produksi.
+
+### Cara menguji
+
+Naskah `/tmp/journey-sim.mjs` memakai **endpoint asli UI**, bukan jalur karangan:
+undangan dibuat lewat `POST /api/collaborations` dengan `{participantId,title,brief,budget}`
+dan tarif di-prefill dari `rateMin` hasil matching — sama persis dengan yang dikirim
+halaman AI Smart Matching. Empat FAIL pada run pertama ternyata **artefak naskah**
+(baca snapshot sebelum aksinya jalan; `escrowHeldAt`/`escrowReleasedAt` memang tidak
+diekspos DTO), dibuktikan lewat query DB, lalu naskahnya dikoreksi. Angka akhir:
+**120/120 lokal**, **104/104 → 110/110 smoke**, audit SQL **20 invarian / 0 pelanggaran**.
+
+### Akar masalah "ditolak tanpa arah"
+
+1. Kartu lamaran `REJECTED` di dashboard kreator tidak punya baris giliran, alasan,
+   maupun tombol lanjutan — blok aksi sebelumnya hanya dirender untuk `ACCEPTED`.
+2. Notifikasi "Lamaran belum cocok" menaut `/dashboard/influencer/campaigns`, halaman
+   yang selalu membuka tab **Kolaborasi** — padahal lamaran ada di tab **Lamaran**, dan
+   halaman itu sama sekali tidak membaca parameter URL.
+3. Brand menolak dengan satu klik tanpa catatan, jadi kreator tidak tahu apa yang
+   bisa diperbaiki (padahal data alasannya ada: tarif vs rentang budget, kategori profil).
+4. Tidak ada penjaga status: lamaran yang sudah `ACCEPTED` masih bisa "ditolak" lewat
+   API dan meninggalkan kolaborasi aktif tanpa lamaran yang mendukungnya.
+
+### Perubahan
+
+- **`src/lib/application.ts`** (baru) — helper murni `getApplicationGuidance(app, note)`:
+  headline per status, baris "giliran siapa", hints yang **dibaca dari data** (tarif di
+  atas/di bawah `budgetMin–budgetMax`, tidak mencantumkan tarif, kategori profil ≠
+  kategori campaign, catatan brand), dan tombol langkah berikutnya. Tarif dan kategori
+  adalah dua sinyal berbeda jadi keduanya boleh muncul bareng, maksimal tiga baris.
+  Sengaja tanpa import supaya bisa diuji langsung seperti `collab.ts`.
+- **`PATCH /api/applications`** — zod `{id, action, note}` (note maks 200 karakter →
+  400, bukan 500); hanya `PENDING|REVIEWED` yang boleh diputus → 409 dengan pesan
+  "Lamaran sudah diputus, muat ulang halaman"; `updateMany` berpenjaga status di cabang
+  accept dan reject (menolak lomba balap dua tab); catatan disimpan di
+  `Application.feedback`; notifikasi penolakan membawa `Catatan dari brand: "…"` dan
+  menaut `…/campaigns?tab=lamaran`.
+- **`schema.prisma`** — `Application.feedback String?` (aditif, `TEXT`).
+- **`CampaignDetailClient`** — tombol "Tolak" membuka modal dengan catatan opsional;
+  lamaran yang sudah diputus menampilkan catatan yang pernah dikirim.
+- **Dashboard lamaran kreator** — membaca `?tab=` lewat `useSearchParams` di dalam
+  pembungkus `Suspense` + `key` (bukan `setState` di effect, agar patuh
+  `react-hooks/set-state-in-effect`), lalu tiap kartu menampilkan bimbingan + tombol.
+- **Kunci duplikasi kolaborasi** (`POST /api/collaborations`) — temuan audit: jalur
+  *undangan* tidak mengunci duplikasi padahal jalur *terima lamaran* menguncinya,
+  sehingga satu brand bisa punya dua kartu terbuka identik untuk campaign yang sama dan
+  tahapannya jalan sendiri-sendiri. Sekarang 409 + `existingId`: kalau menempel campaign
+  → cukup satu kolaborasi non-`COMPLETED|CANCELLED` untuk pasangan brand+kreator itu;
+  kalau tanpa campaign → yang dikunci hanya judul yang sama (case-insensitive), supaya
+  dua proyek berbeda dari orang yang sama tetap boleh. Cek di jalur accept disamakan
+  (hanya status terbuka yang menghalangi, 409 bukan 400, pesan menyebut judul kartunya).
+  Kedua pemanggil UI (`smart-matching`, `highlights`) sudah menampilkan `json.error`,
+  jadi pesan 409 terbaca utuh tanpa perubahan klien.
+
+### Konsekuensi yang perlu diketahui
+
+- Membuka kembali lamaran yang **sudah diputus** tidak bisa lagi lewat API (dulu dipakai
+  untuk membuka lamaran `ARTIZ@gmail.com` → kini 409). Kalau perlu, jalannya lewat DB
+  langsung dengan persetujuan.
+- Status `REVIEWED` dan `WITHDRAWN` masih **tidak pernah ditulis** kode mana pun — ada di
+  enum dan di tipos UI, tapi tidak ada aksi yang mengisinya. Disepakati dibiarkan
+  (tidak dihapus) agar data lama tidak bermigrasi paksa; helper tetap menangani kedua
+  status itu kalau nanti diisi.
+
+### Verifikasi
+
+Lokal terhadap build produksi: `tsc` ✓, `eslint src scripts` ✓, `build` ✓, perjalanan
+penuh 120/120, smoke 110/110 (96 → 104 → 110), harness 189/189, deal-sync 20/20,
+lifecycle-sim 32/32, audit SQL 20 invarian 0 pelanggaran.
+
+## Deploy ronde 3 ke produksi (3 Nov 2026, 21:50–22:00 WIB)
+
+Urutan yang dijalankan (kolom kanan = hasil nyata):
+
+| # | Langkah | Hasil |
+|---|---|---|
+| 1 | Snapshot DB VPS sebelum sentuh | `/root/backups/kolabora-pre-ronde3-20261103T145021Z.sql.gz` (9,6 KB) |
+| 2 | `ALTER TABLE "Application" ADD COLUMN IF NOT EXISTS "feedback" TEXT` | Supabase ✓ lalu VPS ✓ (kolom `text`, nullable) — **sebelum** kode baru jalan |
+| 3 | `git push` → VPS `merge --ff-only` | HEAD `a8e50d1` (2 commit ronde 3: `e75b45c` + `a8e50d1`) |
+| 4 | `deploy-vps.sh --domain kolabora.tech --port 3050 --no-caddy --skip-nginx` | percobaan pertama **GAGAL di langkah Caddy** (`deb.caddyserver.com` tidak resolve dari VPS; caddy memang tidak dipakai di host ini — nginx yang serve). Run kedua dengan `--no-caddy`: `prisma db push` → *"already in sync"* (karena langkah 2), build OK, pm2 reload, health `database: up` |
+| 5 | Perjalanan penuh di `https://kolabora.tech` | **120/120**, nol regresi; jalur B2 (penolakan) lulus 16/16 di produksi |
+| 6 | Smoke suit di produksi | **110/110** |
+| 7 | Audit invarian (jejak uji) | 20 aturan, **0 pelanggaran** |
+| 8 | Pembersihan jejak uji berpenjaga | dry-run ROLLBACK → daftar 10 kolaborasi + 5 campaign + 51 notif → 3 penjaga lolos → COMMIT. Baseline produksi kembali: **9 user / 4 campaign / 4 kolaborasi / 4 lamaran / 14 pesan / 0 review / 16 notif** |
+| 9 | Verifikasi bundel klien live | chunk halaman kreator memuat `Giliran brand: meninjau dan memutuskan` (dibungkus `createProxy(...)`), `Prioritaskan campaign yang se-kategori`, `Perbaiki Profil`, `Cek Rekomendasi Tarif`, `tab=lamaran`; chunk halaman brand memuat `Tolak lamaran ini`, `Catatan untuk kreator (opsional)`, `Catatan yang Anda kirim`. Modal dirender lewat portal sehingga teksnya baru muncul di chunk route terkait, jadi pengecekan dilakukan per halaman |
+
+Penjaga diuji terhadap **data tester yang sungguhan** (bukan data uji):
+
+```
+sebelum                                   : ACCEPTED
+PATCH reject pada lamaran yang diputus    : 409 "Lamaran ini sudah diputus sebelumnya"
+PATCH accept ulang                        : 409
+sesudah                                   : ACCEPTED, feedback=null  → TERKUNCI
+undangan kembar di campaign tester        : 409 "Kolaborasi untuk campaign ini dengan ARTIZZ
+   masih berjalan (“Review Koleksi Batik Ayu Solo untuk Gaya Etnik Harian”)."
+```
+
+Kolaborasi tester `cmvxnqfch000nbzgcnbd5tjw0` (Rp 500.000, 6 pesan) dan
+`cmw0npaoq001tbzw7vx6ky0yb` (Rp 1.000.000, 1 pesan) tetap `NEGOTIATION`,
+`dealConfirmedBy = {}` — kedua sisi masih harus menekan "Konfirmasi Deal" sekali.
+Vercel/Supabase (fallback) tidak berubah bentuknya: 7 user / 3 campaign / 2 kolaborasi /
+2 lamaran / 11 notif, kini plus kolom `feedback`. Catatan: akun demo tidak bisa login di
+fallback Vercel (hash kata sandinya beda dari seed sekarang) — tester tetap wajib memakai
+`kolabora.tech`.
+
+## Temuan baru: baris seed lama tidak memenuhi invarian ronde 2
+
+`Konten TikTok Racikan Signature` (baris demo seed, status `IN_PRODUCTION`) melanggar 4
+invarian di **dev dan produksi sekaligus** — dan hanya baris itu:
+
+| Invarian | Kenapa bocor |
+|---|---|
+| `dealAmount = budget` setelah deal | seed menulis status `IN_PRODUCTION` langsung, tanpa `dealAmount`/`agreedAt`/`dealConfirmedBy` (field itu baru ada mulai ronde 2) |
+| `escrowAmount = dealAmount` saat HELD | `escrowAmount` terisi, `dealAmount` kosong |
+| monotonet `agreedAt >= createdAt` | `agreedAt` diisi 4 hari **sebelum** `createdAt` (tanggal sintetis seed) |
+| minimal 2 pesan SYSTEM untuk deal dua sisi | tidak ada pesan `SYSTEM` sama sekali di chat-nya |
+| (aturan 18) lamaran PENDING + kolaborasi terbuka pasangan sama | campaign yang sama punya lamaran `PENDING` dari kreator yang kolaborasinya sudah berjalan |
+
+Dampak ke pengguna: kartu itu tetap jalan (aksi tahap 5 tersedia), tapi riwayat deal-nya
+tidak lengkap — dan kalau brand menekan "Terima" pada lamaran PENDING itu hari ini, ia
+dapat **409** dari kunci duplikasi (dulu: kolaborasi kembar). Jadi bukan bug alur, tapi
+data demo yang belum diselaraskan. Belum kutambal — butuh keputusan: selaraskan
+`prisma/seed.mjs` + UPDATE dua baris live, atau biarkan apa adanya.
+
+Audit global baru (`/tmp/global-audit.sql`, 22 aturan) dipakai untuk menemukan ini; ia
+bukan pengganti audit berlingkup `JALAN%`, tapi memeriksa seluruh baris sehingga temuan
+tidak terbatas pada jejak ujiku sendiri.
+
+## Balasan untuk tester (ronde 3)
+
+1. **"Lamaran ditolak" sekarang bicara.** Di tab **Lamaran** (dashboard kreator), kartu
+   yang ditolak menampilkan: siapa yang giliran, **alasan yang dibaca dari data**
+   (tarif kamu di atas/di bawah rentang budget campaign, kamu tidak menulis tarif, atau
+   kategori profilmu beda dari kategori campaign), plus catatan bila brand menuliskan
+   sesuatu — dan tombol lanjutan: *Cari Campaign Lain*, *Campaign Cocok Untuk Anda*,
+   *Perbaiki Profil*, *Cek Rekomendasi Tarif*. Notifikasi "Lamaran belum cocok" kini
+   langsung membuka tab Lamaran, bukan halaman yang salah.
+2. **Brand bisa menulis alasan.** Tombol "Tolak" di halaman campaign kini membuka modal
+   dengan catatan opsional (maks 200 karakter) yang dikirim ke kreator. Tidak wajib diisi,
+   jadi menolak cepat tetap bisa.
+3. **Satu campaign + satu kreator = satu kartu.** Mengirim tawaran kedua untuk campaign
+   yang sama sekarang ditolak dengan pesan yang menyebut kartu mana yang masih berjalan
+   (dan kartu lama harus diselesaikan/dibatalkan dulu). Untuk undangan bebas tanpa
+   campaign, yang dikunci hanya judul yang sama — dua proyek berbeda tetap boleh.
+4. **Lamaran yang sudah diputus tidak bisa dibalik lewat layar.** Mencegah keadaan
+   "kolaborasi aktif tapi lamarannya berstatus ditolak". Kalau memang perlu membuka
+   kembali, itu jalur khusus (tulis langsung ke database), bukan tombol.
+
+Status `REVIEWED` (sedang ditinjau) dan `WITHDRAWN` (ditarik) sampai sekarang **tidak
+pernah ditulis** oleh alur mana pun — tidak ada tombol "Tandai sudah ditinjau" atau "Tarik
+lamaran". Keduanya dibiarkan ada di sistem (data lama tidak diapa-apakan) dan kartu dengan
+status itu tetap diberi bimbingan yang benar, tapi sampai ada permintaan nyata lebih baik
+tidak dibuat.

@@ -186,11 +186,38 @@ Yang perlu diketahui:
 
 ---
 
+## 4b. Perbaikan data sekali jalan (bukan bagian deploy)
+
+Bila sebuah rilis mengubah cara baris lama harus dibaca, tambahkan skrip
+ber-guard di `scripts/sql/` dan jalankan sebagai superuser — idempoten, hanya
+menyentuh baris yang memang cocok dengan kondisi lama, dan menampilkan
+SEBELUM/SESUDAH supaya bisa dibaca sebelum di-`COMMIT`.
+
+Contoh yang sudah diterapkan: `scripts/sql/fix-negotiation-status.sql`
+(3 Nov 2026, kolabora.tech). Kolaborasi yang lahir dari **lamaran yang diterima**
+dulu dibuat di status `PROPOSED` ("menunggu respons"), sehingga dashboard sisi
+kreator masih menulis "Terima Tawaran" padahal dia yang melamar. Kode barunya
+membuat `NEGOTIATION`; skrip ini menormalkan data lama.
+
+```bash
+# cadangkan dulu baris yang akan disentuh
+su postgres -c "psql -x -d kolabora -c \"SELECT * FROM \\\"Collaboration\\\" WHERE id='<id>';\"" > /tmp/rollback.txt
+scp scripts/sql/fix-negotiation-status.sql root@IP:/tmp/
+su postgres -c "psql -q -v ON_ERROR_STOP=1 -d kolabora -f /tmp/fix-negotiation-status.sql"
+rm -f /tmp/fix-negotiation-status.sql
+```
+
+Jalankan sebelum smoke test: baris uji juga punya pasangan lamaran `ACCEPTED`,
+jadi memisahkannya membuat dampak skrip mudah dibaca (dan hasilnya harus 0 baris
+pada jalan kedua).
+
+---
+
 ## 5. Uji setelah deploy
 
 ```bash
 # dari laptop, terhadap URL publik
-BASE_URL=https://kolabora.tech npm run smoke        # 81 pemeriksaan alur, butuh akun demo
+BASE_URL=https://kolabora.tech npm run smoke        # 85 pemeriksaan alur, butuh akun demo
 ```
 
 `scripts/smoke-test.mjs` membuat kampanye berjudul `SMOKE …` dan beberapa baris
@@ -210,7 +237,7 @@ CREATE TEMP TABLE collab ON COMMIT DROP AS
      OR (c."createdAt" >= '2026-11-01 00:00:00' AND (c.title LIKE 'SMOKE%' OR c.title LIKE 'Uji %'));
 DELETE FROM "Message"                    WHERE "collaborationId" IN (SELECT id FROM collab);
 DELETE FROM "ContentReview"              WHERE "collaborationId" IN (SELECT id FROM collab);
-DELETE FROM "_CollaborationParticipants" WHERE "B" IN (SELECT id FROM collab);
+DELETE FROM "_CollaborationParticipants" WHERE "A" IN (SELECT id FROM collab);
 DELETE FROM "Collaboration"              WHERE id IN (SELECT id FROM collab);
 DELETE FROM "Application"                WHERE "campaignId" IN (SELECT id FROM camp);
 DELETE FROM "PortfolioItem"              WHERE "createdAt" >= '2026-11-01 00:00:00' AND title LIKE 'Uji %';
@@ -230,7 +257,7 @@ Yang wajib hijau:
 
 - [ ] `https://kolabora.tech/api/health` → `ok: true`, `database: "up"`
 - [ ] sertifikat: `sudo certbot certificates` (kedaluwarsa > 30 hari → `certbot renew`)
-- [ ] `pm2 status` → `kolaborasi online`, dan `systemctl is-enabled pm2-root.service` → `enabled`
+- [ ] `pm2 status` → `kolabora online`, dan `systemctl is-enabled pm2-root.service` → `enabled`
 - [ ] login akun yang ada → dashboard, chat dua arah, escrow (tahan → lepas), review, `COMPLETED`
 - [ ] unggah gambar (bila `BLOB_READ_WRITE_TOKEN` diisi)
 - [ ] `ss -tlnp | grep 3050` → hanya `127.0.0.1`
